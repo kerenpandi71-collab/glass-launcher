@@ -70,7 +70,9 @@ class DesktopModeActivity : ComponentActivity() {
     private fun launchApp(repository: AppRepository, app: AppInfo, displayId: Int) {
         val options = ActivityOptions.makeBasic().setLaunchDisplayId(displayId)
         try {
-            options.setLaunchWindowingMode(WINDOWING_MODE_FREEFORM)
+            ActivityOptions::class.java
+                .getMethod("setLaunchWindowingMode", Int::class.javaPrimitiveType)
+                .invoke(options, WINDOWING_MODE_FREEFORM)
         } catch (e: Exception) {
         }
         startActivity(repository.launchIntent(app), options.toBundle())

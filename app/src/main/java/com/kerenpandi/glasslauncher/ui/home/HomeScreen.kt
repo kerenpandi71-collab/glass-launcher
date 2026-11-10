@@ -246,14 +246,15 @@ fun WidgetCard(
         val maxWidthDp = maxWidth.value.toInt()
         GlassPanel(shape = RoundedCornerShape(24.dp)) {
             Box(Modifier.padding(6.dp)) {
-                if (hostView != null) {
+                val view = hostView
+                if (view != null) {
                     val clampedWidth = widthDp.coerceAtMost(maxWidthDp)
                     val heightPx = with(density) { heightDp.dp.toPx() }.toInt()
                     AndroidView(
                         factory = { ctx ->
                             FrameLayout(ctx).apply {
                                 addView(
-                                    hostView,
+                                    view,
                                     FrameLayout.LayoutParams(
                                         FrameLayout.LayoutParams.MATCH_PARENT,
                                         heightPx
@@ -299,7 +300,7 @@ fun WidgetCard(
                             detectDragGestures(
                                 onDragEnd = {
                                     try {
-                                        hostView.updateAppWidgetSize(
+                                        view.updateAppWidgetSize(
                                             Bundle(),
                                             widthDp,
                                             heightDp,
