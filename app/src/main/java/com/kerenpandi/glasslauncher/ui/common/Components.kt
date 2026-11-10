@@ -57,14 +57,15 @@ fun AppIcon(
     iconSize: Dp = 52.dp,
     showLabel: Boolean = true,
     onClick: () -> Unit,
-    extraMenuItems: List<AppMenuItem> = emptyList()
+    extraMenuItems: List<AppMenuItem> = emptyList(),
+    modifier: Modifier = Modifier
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val bitmap = remember(app) {
         app.icon.toBitmap(96, 96).asImageBitmap()
     }
-    Box {
+    Box(modifier = modifier) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,

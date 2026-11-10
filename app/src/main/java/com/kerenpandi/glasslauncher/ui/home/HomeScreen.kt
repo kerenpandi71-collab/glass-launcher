@@ -233,6 +233,7 @@ fun AppGridPage(
                     val appKey = app.stableKey()
                     AppIcon(
                         app = app,
+                        modifier = Modifier.weight(1f),
                         onClick = { onAppClick(app) },
                         extraMenuItems = buildList {
                             if (!dockFull && appKey !in dockKeys) {
