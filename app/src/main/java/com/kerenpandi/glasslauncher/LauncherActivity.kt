@@ -43,7 +43,7 @@ class LauncherActivity : ComponentActivity() {
                 HomeScreen(
                     viewModel = viewModel,
                     onAddWidget = { addWidget() },
-                    onLaunchSecondary = { displayId -> launchSecondaryHome(displayId) },
+                    onOpenDesktopMode = { displayId -> launchDesktopMode(displayId) },
                     onSetWallpaper = { openWallpaperPicker() }
                 )
             }
@@ -66,11 +66,11 @@ class LauncherActivity : ComponentActivity() {
         widgetPickerLauncher.launch(widgetRepository.widgetPickerIntent(id))
     }
 
-    private fun launchSecondaryHome(displayId: Int) {
+    private fun launchDesktopMode(displayId: Int) {
         val options = ActivityOptions.makeBasic().setLaunchDisplayId(displayId)
         startActivity(
-            Intent(this, SecondaryHomeActivity::class.java)
-                .putExtra(SecondaryHomeActivity.EXTRA_DISPLAY_ID, displayId)
+            Intent(this, DesktopModeActivity::class.java)
+                .putExtra(DesktopModeActivity.EXTRA_DISPLAY_ID, displayId)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK),
             options.toBundle()
         )

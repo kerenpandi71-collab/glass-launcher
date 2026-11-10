@@ -1,41 +1,46 @@
 # Glass Launcher 🧊
 
 Launcher Android bertema **liquid glass** ala iOS, dibangun dengan Kotlin + Jetpack Compose.
-Mendukung **widget Android standar**, **app drawer**, **dock**, dan **secondary display**
-(asli maupun simulasi dari Developer Options).
+Dirancang ringan untuk HP entry-level (diuji menargetkan Redmi 12C / Helio G85),
+**tanpa laci aplikasi** — semua aplikasi tampil di halaman homescreen seperti iPhone.
 
 ## Fitur
 
-- **Liquid glass UI** — panel kaca transparan dengan gradient, border highlight, dan wallpaper yang di-blur di belakangnya (`Modifier.blur`, butuh Android 12+ untuk blur asli; di bawahnya otomatis fallback ke overlay gelap).
-- **Homescreen 2 halaman** — halaman widget + halaman grid aplikasi, dengan indikator halaman.
-- **Widget support** — tambah widget lewat *Pengaturan → Tambah widget* (memakai picker sistem Android), widget di-host dengan `AppWidgetHost` dan bisa dihapus per kartu.
-- **App drawer** — buka lewat tombol menu di dock, ada pencarian aplikasi.
-- **Dock** ala iOS dengan 4 aplikasi + tombol drawer.
-- **Jam & tanggal** besar di atas.
-- **Secondary display** — buka *Pengaturan → Layar sekunder* untuk melihat daftar display dan menjalankan "Glass Home" di display mana pun. Bisa dites tanpa monitor lewat simulasi (lihat di bawah).
+- **Liquid glass UI** — panel kaca transparan dengan gradient dan border highlight, tampil di atas **wallpaper sistem asli** (tanpa blur bitmap berat → hemat RAM & baterai di HP kentang).
+- **Tanpa app drawer** ala iPhone — halaman 1 berisi widget, halaman berikutnya grid aplikasi (24 aplikasi per halaman) dengan indikator halaman.
+- **Widget Android standar** — tambah via *Pengaturan → Tambah widget*, di-host dengan `AppWidgetHost`.
+- **Widget bisa di-resize** — tarik handle di pojok kanan-bawah kartu widget; ukuran disimpan otomatis dan isi widget ikut me-layout ulang (`updateAppWidgetSize`).
+- **Dock** ala iOS dengan 4 aplikasi.
+- **Desktop Mode** (dulu "layar sekunder") — desktop ala PC dengan **taskbar** kaca di bawah (terinspirasi [farmerbb/Taskbar](https://github.com/farmerbb/Taskbar)): tombol semua-aplikasi, aplikasi pinned, dan peluncuran aplikasi dalam jendela freeform bila didukung perangkat. Bisa jalan di display asli maupun simulasi.
+
+## Optimasi untuk HP entry-level (Redmi 12C)
+
+- Tidak ada blur full-screen (`Modifier.blur` dihilangkan) — efek glass murni gradient + translucensi.
+- Wallpaper tidak pernah dibuka sebagai bitmap — window launcher menampilkan wallpaper sistem langsung (overdraw minimal).
+- Ikon aplikasi di-decode sekali ke bitmap 96px dan di-cache per aplikasi.
+- Tanpa laci = tidak ada layout ganda; satu daftar aplikasi dipakai bersama.
 
 ## Cara Build
 
 1. Clone repo ini.
-2. Buka di **Android Studio** (Koala/terbaru, JDK 17 bawaan).
-3. Jika Android Studio menampilkan error `gradle-wrapper.jar` hilang, pilih opsi **perbaiki/recreate wrapper** yang muncul, atau jalankan `gradle wrapper` di terminal proyek. (File jar wrapper biner tidak disertakan di repo ini.)
-4. `Build → Make Project`, lalu `Run` di perangkat/emulator **Android 8.0 (API 26) ke atas**.
+2. Buka di **Android Studio** (Koala/terbaru, JDK 17 bawaan), atau jalankan `./gradlew assembleDebug`.
+3. APK debug juga otomatis di-build oleh GitHub Actions setiap push — unduh dari tab **Actions → Build → Artifacts**.
 
 ## Set sebagai Launcher Default
 
 Setelah install: `Settings → Apps → Default apps → Home app → Glass Launcher`, atau tekan Home lalu pilih Glass Launcher.
 
-## Mencoba Secondary Display (tanpa monitor)
+## Mencoba Desktop Mode (tanpa monitor)
 
 1. Aktifkan **Developer options** di HP.
 2. Buka **Developer options → Simulate secondary displays** → pilih misalnya *720p*.
-3. Buka Glass Launcher → **Pengaturan → Layar sekunder** → daftar display akan muncul → tekan **Buka** pada layar simulasi.
-4. "Glass Home" akan tampil di display tersebut; ketuk ikon aplikasi untuk menjalankannya di display yang sama.
+3. Buka Glass Launcher → **Pengaturan → Desktop Mode** → daftar display muncul → tekan **Buka**.
+4. Desktop dengan taskbar tampil di display tersebut; ketuk ikon untuk meluncurkan aplikasi (jendela freeform bila ROM mendukung).
 
 ## Batasan yang Diketahui
 
 - Widget yang butuh konfigurasi awal dibuka tanpa wizard konfigurasi (versi awal).
-- Blur wallpaper butuh Android 12 (API 31)+; di Android 8–11 tampil sebagai overlay gelap tanpa blur.
+- Jendela freeform di Desktop Mode bergantung pada dukungan ROM (`FEATURE_FREEFORM_WINDOW_MANAGEMENT`); tanpa dukungan, aplikasi terbuka fullscreen di display tersebut.
 - Beberapa ROM membatasi peluncuran aplikasi pihak ketiga di display sekunder; jika aplikasi terbuka di layar utama, itu keterbatasan ROM, bukan bug launcher.
 
 ## Struktur Proyek
@@ -44,16 +49,16 @@ Setelah install: `Settings → Apps → Default apps → Home app → Glass Laun
 app/src/main/java/com/kerenpandi/glasslauncher/
 ├── GlassLauncherApp.kt          # Application, inisialisasi WidgetRepository
 ├── LauncherActivity.kt          # HOME activity utama
-├── SecondaryHomeActivity.kt     # Glass Home untuk layar sekunder
+├── DesktopModeActivity.kt       # Desktop Mode + taskbar untuk layar lain
 ├── LauncherViewModel.kt         # State daftar aplikasi & widget
 ├── data/
 │   ├── AppRepository.kt         # Query aplikasi ter-install
-│   └── WidgetRepository.kt      # AppWidgetHost + persistensi widget
+│   └── WidgetRepository.kt      # AppWidgetHost + persistensi widget & ukuran
 └── ui/
     ├── theme/Theme.kt           # GlassTheme (dark + transparan)
-    ├── glass/Glass.kt           # Modifier glassSurface, GlassPanel, WallpaperBackdrop
+    ├── glass/Glass.kt           # glassSurface, GlassPanel, GlassScrim, DesktopBackdrop
     ├── common/Components.kt     # AppIcon, ClockHeader, GlassIconButton
-    └── home/                    # HomeScreen, AppDrawer, SettingsSheet
+    └── home/                    # HomeScreen (widget + resize), SettingsSheet
 ```
 
 ## Lisensi

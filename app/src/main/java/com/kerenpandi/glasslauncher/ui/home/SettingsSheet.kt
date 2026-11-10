@@ -41,7 +41,7 @@ import com.kerenpandi.glasslauncher.ui.glass.GlassPanel
 @Composable
 fun SettingsSheet(
     onAddWidget: () -> Unit,
-    onLaunchSecondary: (Int) -> Unit,
+    onOpenDesktopMode: (Int) -> Unit,
     onSetWallpaper: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -93,19 +93,19 @@ fun SettingsSheet(
                         modifier = Modifier.padding(vertical = 8.dp)
                     )
                     Text(
-                        text = "Layar sekunder",
+                        text = "Desktop Mode",
                         color = Color.White,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        text = "Aktifkan simulasi lewat Setelan → Developer options → Simulate secondary displays, lalu buka sheet ini lagi.",
+                        text = "Desktop ala PC dengan taskbar di layar lain. Untuk tes tanpa monitor: Setelan → Developer options → Simulate secondary displays, lalu buka sheet ini lagi.",
                         color = Color.White.copy(alpha = 0.65f),
                         fontSize = 12.sp,
                         modifier = Modifier.padding(top = 4.dp, bottom = 6.dp)
                     )
                     displays.forEach { display ->
-                        DisplayRow(display = display, onLaunch = onLaunchSecondary)
+                        DisplayRow(display = display, onLaunch = onOpenDesktopMode)
                     }
                 }
             }

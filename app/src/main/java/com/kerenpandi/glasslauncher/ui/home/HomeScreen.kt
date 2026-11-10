@@ -1,5 +1,7 @@
 package com.kerenpandi.glasslauncher.ui.home
 
+import android.os.Bundle
+import android.widget.FrameLayout
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -7,8 +9,10 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -18,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -29,7 +34,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -42,12 +46,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import android.widget.FrameLayout
 import com.kerenpandi.glasslauncher.GlassLauncherApp
 import com.kerenpandi.glasslauncher.LauncherViewModel
 import com.kerenpandi.glasslauncher.data.AppInfo
@@ -55,21 +60,24 @@ import com.kerenpandi.glasslauncher.ui.common.AppIcon
 import com.kerenpandi.glasslauncher.ui.common.ClockHeader
 import com.kerenpandi.glasslauncher.ui.common.GlassIconButton
 import com.kerenpandi.glasslauncher.ui.glass.GlassPanel
-import com.kerenpandi.glasslauncher.ui.glass.WallpaperBackdrop
+import com.kerenpandi.glasslauncher.ui.glass.GlassScrim
+
+private const val APPS_PER_PAGE = 24
 
 @Composable
 fun HomeScreen(
     viewModel: LauncherViewModel,
     onAddWidget: () -> Unit,
-    onLaunchSecondary: (Int) -> Unit,
+    onOpenDesktopMode: (Int) -> Unit,
     onSetWallpaper: () -> Unit
 ) {
-    var drawerOpen by remember { mutableStateOf(false) }
     var settingsOpen by remember { mutableStateOf(false) }
     val apps = viewModel.apps
+    val appPages = remember(apps) { apps.chunked(APPS_PER_PAGE) }
+    val pageCount = appPages.size + 1
 
     Box(Modifier.fillMaxSize()) {
-        WallpaperBackdrop()
+        GlassScrim()
 
         Column(
             Modifier
@@ -92,20 +100,21 @@ fun HomeScreen(
                 )
             }
 
-            val pagerState = rememberPagerState(pageCount = { 2 })
+            val pagerState = rememberPagerState(pageCount = { pageCount })
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier
                     .weight(1f)
                     .padding(vertical = 12.dp)
             ) { page ->
-                when (page) {
-                    0 -> WidgetPage(
+                when {
+                    page == 0 -> WidgetPage(
                         widgetIds = viewModel.widgetIds,
-                        onRemove = { id -> viewModel.removeWidgetId(id) }
+                        onRemove = { id -> viewModel.removeWidgetId(id) },
+                        onResize = { id, w, h -> viewModel.saveWidgetSize(id, w, h) }
                     )
                     else -> AppGridPage(
-                        apps = apps.take(24),
+                        apps = appPages[page - 1],
                         onAppClick = { viewModel.launch(it) }
                     )
                 }
@@ -117,7 +126,7 @@ fun HomeScreen(
                     .padding(bottom = 8.dp),
                 horizontalArrangement = Arrangement.Center
             ) {
-                repeat(2) { index ->
+                repeat(pageCount) { index ->
                     Box(
                         Modifier
                             .padding(horizontal = 4.dp)
@@ -134,24 +143,7 @@ fun HomeScreen(
             Dock(
                 apps = apps.take(4),
                 onAppClick = { viewModel.launch(it) },
-                onDrawerClick = { drawerOpen = true },
                 modifier = Modifier.padding(bottom = 20.dp)
-            )
-        }
-
-        AnimatedVisibility(
-            visible = drawerOpen,
-            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
-            modifier = Modifier.fillMaxSize()
-        ) {
-            AppDrawer(
-                apps = apps,
-                onAppClick = {
-                    viewModel.launch(it)
-                    drawerOpen = false
-                },
-                onDismiss = { drawerOpen = false }
             )
         }
 
@@ -163,7 +155,7 @@ fun HomeScreen(
         ) {
             SettingsSheet(
                 onAddWidget = onAddWidget,
-                onLaunchSecondary = onLaunchSecondary,
+                onOpenDesktopMode = onOpenDesktopMode,
                 onSetWallpaper = onSetWallpaper,
                 onDismiss = { settingsOpen = false }
             )
@@ -175,7 +167,6 @@ fun HomeScreen(
 fun Dock(
     apps: List<AppInfo>,
     onAppClick: (AppInfo) -> Unit,
-    onDrawerClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     GlassPanel(
@@ -192,20 +183,6 @@ fun Dock(
             apps.forEach { app ->
                 AppIcon(app = app, showLabel = false, onClick = { onAppClick(app) })
             }
-            Box(
-                Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.18f))
-                    .clickable(onClick = onDrawerClick),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    Icons.Default.Menu,
-                    contentDescription = "Buka drawer",
-                    tint = Color.White
-                )
-            }
         }
     }
 }
@@ -214,6 +191,7 @@ fun Dock(
 fun WidgetPage(
     widgetIds: List<Int>,
     onRemove: (Int) -> Unit,
+    onResize: (Int, Int, Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
     if (widgetIds.isEmpty()) {
@@ -236,66 +214,121 @@ fun WidgetPage(
         contentPadding = PaddingValues(vertical = 4.dp)
     ) {
         items(widgetIds, key = { it }) { id ->
-            WidgetCard(id = id, onRemove = { onRemove(id) })
+            WidgetCard(
+                id = id,
+                onRemove = { onRemove(id) },
+                onResize = onResize
+            )
         }
     }
 }
 
 @Composable
-fun WidgetCard(id: Int, onRemove: () -> Unit) {
+fun WidgetCard(
+    id: Int,
+    onRemove: () -> Unit,
+    onResize: (Int, Int, Int) -> Unit
+) {
     val context = LocalContext.current
     val widgetRepository = (context.applicationContext as GlassLauncherApp).widgetRepository
     val info = remember(id) { widgetRepository.widgetInfo(id) }
     val hostView = remember(id) { widgetRepository.createHostView(id) }
-    val density = androidx.compose.ui.platform.LocalDensity.current
-    val slotHeight = (info?.minHeight ?: 120).coerceAtLeast(110).dp
+    val density = LocalDensity.current
+    val savedSize = remember(id) { widgetRepository.loadWidgetSize(id) }
+    var widthDp by remember(id) {
+        mutableStateOf(savedSize?.first ?: ((info?.minWidth ?: 220).coerceAtLeast(160)))
+    }
+    var heightDp by remember(id) {
+        mutableStateOf(savedSize?.second ?: ((info?.minHeight ?: 140).coerceAtLeast(110)))
+    }
 
-    GlassPanel(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp)
-    ) {
-        Box(Modifier.padding(6.dp)) {
-            if (hostView != null) {
-                val heightPx = with(density) { slotHeight.toPx() }.toInt()
-                AndroidView(
-                    factory = { ctx ->
-                        FrameLayout(ctx).apply {
-                            addView(
-                                hostView,
-                                FrameLayout.LayoutParams(
-                                    FrameLayout.LayoutParams.MATCH_PARENT,
-                                    heightPx
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val maxWidthDp = maxWidth.value.toInt()
+        GlassPanel(shape = RoundedCornerShape(24.dp)) {
+            Box(Modifier.padding(6.dp)) {
+                if (hostView != null) {
+                    val clampedWidth = widthDp.coerceAtMost(maxWidthDp)
+                    val heightPx = with(density) { heightDp.dp.toPx() }.toInt()
+                    AndroidView(
+                        factory = { ctx ->
+                            FrameLayout(ctx).apply {
+                                addView(
+                                    hostView,
+                                    FrameLayout.LayoutParams(
+                                        FrameLayout.LayoutParams.MATCH_PARENT,
+                                        heightPx
+                                    )
                                 )
-                            )
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(slotHeight)
-                )
-            } else {
-                Text(
-                    text = "Widget tidak tersedia",
-                    color = Color.White.copy(alpha = 0.8f),
-                    fontSize = 13.sp,
-                    modifier = Modifier.padding(16.dp)
-                )
-            }
-            Box(
-                Modifier
-                    .align(Alignment.TopEnd)
-                    .size(26.dp)
-                    .clip(CircleShape)
-                    .background(Color.Black.copy(alpha = 0.35f))
-                    .clickable(onClick = onRemove),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    Icons.Default.Close,
-                    contentDescription = "Hapus widget",
-                    tint = Color.White,
-                    modifier = Modifier.size(14.dp)
-                )
+                            }
+                        },
+                        modifier = Modifier
+                            .width(clampedWidth.dp)
+                            .height(heightDp.dp)
+                    )
+                } else {
+                    Text(
+                        text = "Widget tidak tersedia",
+                        color = Color.White.copy(alpha = 0.8f),
+                        fontSize = 13.sp,
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
+                Box(
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .size(26.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.35f))
+                        .clickable(onClick = onRemove),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = "Hapus widget",
+                        tint = Color.White,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+                Box(
+                    Modifier
+                        .align(Alignment.BottomEnd)
+                        .size(24.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color.Black.copy(alpha = 0.4f))
+                        .pointerInput(id) {
+                            detectDragGestures(
+                                onDragEnd = {
+                                    try {
+                                        hostView.updateAppWidgetSize(
+                                            Bundle(),
+                                            widthDp,
+                                            heightDp,
+                                            widthDp,
+                                            heightDp
+                                        )
+                                    } catch (e: Exception) {
+                                    }
+                                    onResize(id, widthDp, heightDp)
+                                }
+                            ) { change, dragAmount ->
+                                change.consume()
+                                widthDp = (widthDp + dragAmount.x / density.density)
+                                    .toInt()
+                                    .coerceIn(160, 1000)
+                                heightDp = (heightDp + dragAmount.y / density.density)
+                                    .toInt()
+                                    .coerceIn(90, 1000)
+                            }
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        Modifier
+                            .size(10.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(Color.White.copy(alpha = 0.7f))
+                    )
+                }
             }
         }
     }

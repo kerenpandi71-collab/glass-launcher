@@ -52,9 +52,30 @@ class WidgetRepository(private val context: Context) {
             .apply()
     }
 
+    fun loadWidgetSize(id: Int): Pair<Int, Int>? =
+        prefs.getStringSet(KEY_WIDGET_SIZES, emptySet())
+            ?.firstOrNull { it.startsWith("$id:") }
+            ?.split(":")
+            ?.takeIf { it.size == 3 }
+            ?.let {
+                val width = it[1].toIntOrNull() ?: return null
+                val height = it[2].toIntOrNull() ?: return null
+                Pair(width, height)
+            }
+
+    fun saveWidgetSize(id: Int, widthDp: Int, heightDp: Int) {
+        val sizes = prefs.getStringSet(KEY_WIDGET_SIZES, emptySet())
+            ?.filterNot { it.startsWith("$id:") }
+            ?.toMutableSet()
+            ?: mutableSetOf()
+        sizes.add("$id:$widthDp:$heightDp")
+        prefs.edit().putStringSet(KEY_WIDGET_SIZES, sizes).apply()
+    }
+
     companion object {
         const val HOST_ID = 0x474C
         private const val PREFS_NAME = "glass_launcher_widgets"
         private const val KEY_WIDGET_IDS = "widget_ids"
+        private const val KEY_WIDGET_SIZES = "widget_sizes"
     }
 }

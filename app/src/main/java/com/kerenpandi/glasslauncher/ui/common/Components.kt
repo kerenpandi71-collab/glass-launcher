@@ -27,6 +27,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
@@ -46,7 +47,7 @@ fun AppIcon(
     onClick: () -> Unit
 ) {
     val bitmap = remember(app) {
-        app.icon.toBitmap(128, 128).asImageBitmap()
+        app.icon.toBitmap(96, 96).asImageBitmap()
     }
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -79,7 +80,11 @@ fun AppIcon(
 }
 
 @Composable
-fun ClockHeader(modifier: Modifier = Modifier) {
+fun ClockHeader(
+    modifier: Modifier = Modifier,
+    timeFontSize: TextUnit = 54.sp,
+    dateFontSize: TextUnit = 14.sp
+) {
     var now by remember { mutableStateOf(LocalTime.now()) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -91,13 +96,13 @@ fun ClockHeader(modifier: Modifier = Modifier) {
         Text(
             text = now.format(DateTimeFormatter.ofPattern("HH:mm")),
             color = Color.White,
-            fontSize = 54.sp
+            fontSize = timeFontSize
         )
         Text(
             text = LocalDate.now()
                 .format(DateTimeFormatter.ofPattern("EEEE, d MMMM", Locale.getDefault())),
             color = Color.White.copy(alpha = 0.85f),
-            fontSize = 14.sp,
+            fontSize = dateFontSize,
             modifier = Modifier.padding(top = 2.dp)
         )
     }

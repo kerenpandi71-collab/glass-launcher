@@ -48,4 +48,8 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         widgetRepository.deleteAppWidgetId(id)
         widgetRepository.saveWidgetIds(widgetIds)
     }
+
+    fun saveWidgetSize(id: Int, widthDp: Int, heightDp: Int) {
+        widgetRepository.saveWidgetSize(id, widthDp, heightDp)
+    }
 }
