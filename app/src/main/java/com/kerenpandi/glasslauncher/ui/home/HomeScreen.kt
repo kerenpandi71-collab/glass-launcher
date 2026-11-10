@@ -340,9 +340,9 @@ private fun DraggableAppIcon(
                         fingerPos = itemCenters[appKey] ?: Offset.Zero
                         onDraggingChanged(true)
                     },
-                    onDrag = { change ->
+                    onDrag = { change, dragAmount ->
                         change.consume()
-                        val next = fingerPos + change.dragAmount
+                        val next = fingerPos + dragAmount
                         fingerPos = next
                         var nearestKey: String? = null
                         var nearestDist = Float.MAX_VALUE
