@@ -33,6 +33,35 @@ jobs:
         with:
           gradle-version: '8.9'
 
+      - name: Check signing keystore
+        id: keystore
+        run: |
+          if [ -f keystore/glass-launcher.keystore ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Generate signing keystore
+        if: steps.keystore.outputs.exists == 'false'
+        run: |
+          mkdir -p keystore
+          keytool -genkeypair -v \
+            -keystore keystore/glass-launcher.keystore \
+            -alias glasslauncher \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass glasslauncher123 -keypass glasslauncher123 \
+            -dname "CN=Glass Launcher, OU=Dev, O=kerenpandi71, L=ID, ST=ID, C=ID"
+
+      - name: Commit signing keystore
+        if: steps.keystore.outputs.exists == 'false'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add keystore/glass-launcher.keystore
+          git commit -m "Add stable signing keystore" || echo "nothing to commit"
+          git push
+
       - name: Generate Gradle wrapper
         if: steps.wrapper.outputs.exists == 'false'
         run: gradle wrapper --gradle-version 8.9 --no-daemon

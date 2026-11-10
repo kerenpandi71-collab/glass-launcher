@@ -4,6 +4,8 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+val glassKeystore = rootProject.file("keystore/glass-launcher.keystore")
+
 android {
     namespace = "com.kerenpandi.glasslauncher"
     compileSdk = 35
@@ -12,13 +14,32 @@ android {
         applicationId = "com.kerenpandi.glasslauncher"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
+    }
+
+    signingConfigs {
+        if (glassKeystore.exists()) {
+            create("glass") {
+                storeFile = glassKeystore
+                storePassword = "glasslauncher123"
+                keyAlias = "glasslauncher"
+                keyPassword = "glasslauncher123"
+            }
+        }
     }
 
     buildTypes {
+        debug {
+            if (glassKeystore.exists()) {
+                signingConfig = signingConfigs.getByName("glass")
+            }
+        }
         release {
             isMinifyEnabled = false
+            if (glassKeystore.exists()) {
+                signingConfig = signingConfigs.getByName("glass")
+            }
         }
     }
 
