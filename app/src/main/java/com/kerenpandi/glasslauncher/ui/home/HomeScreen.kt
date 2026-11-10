@@ -300,7 +300,7 @@ fun WidgetCard(
                             detectDragGestures(
                                 onDragEnd = {
                                     try {
-                                        view.updateAppWidgetSize(
+                                        view?.updateAppWidgetSize(
                                             Bundle(),
                                             widthDp,
                                             heightDp,
