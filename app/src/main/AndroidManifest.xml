@@ -17,6 +17,7 @@
             android:name=".LauncherActivity"
             android:exported="true"
             android:clearTaskOnLaunch="true"
+            android:excludeFromRecents="true"
             android:launchMode="singleTask"
             android:resumeWhilePausing="true"
             android:stateNotNeeded="true"
