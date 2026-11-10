@@ -2,8 +2,8 @@ package com.kerenpandi.glasslauncher.ui.home
 
 import android.content.Context
 import android.graphics.Point
-import android.hardware.display.Display
 import android.hardware.display.DisplayManager
+import android.view.Display
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
