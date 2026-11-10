@@ -23,6 +23,8 @@ class OrderStore(context: Context) {
             .apply()
     }
 
+    fun hasDockOrder(): Boolean = prefs.getString(KEY_DOCK, null) != null
+
     fun applyDockOrder(loaded: List<AppInfo>): List<AppInfo> {
         val byKey = loaded.associateBy { it.stableKey() }
         return loadDockOrder().mapNotNull { byKey[it] }

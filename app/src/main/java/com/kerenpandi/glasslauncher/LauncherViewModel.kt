@@ -28,7 +28,11 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     fun refresh() {
         val loaded = repository.loadApps()
         apps = orderStore.applyOrder(loaded)
-        dockApps = orderStore.applyDockOrder(loaded)
+        dockApps = if (orderStore.hasDockOrder()) {
+            orderStore.applyDockOrder(loaded)
+        } else {
+            apps.take(DOCK_CAPACITY)
+        }
     }
 
     fun swapApps(keyA: String, keyB: String) {
