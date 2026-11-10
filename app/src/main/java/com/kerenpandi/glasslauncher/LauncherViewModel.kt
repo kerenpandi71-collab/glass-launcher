@@ -12,6 +12,7 @@ import com.kerenpandi.glasslauncher.data.AppRepository
 class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     private val repository = AppRepository(app)
+    private val widgetRepository = (app as GlassLauncherApp).widgetRepository
 
     var apps by mutableStateOf<List<AppInfo>>(emptyList())
         private set
@@ -21,7 +22,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         refresh()
-        widgetIds = repository.loadWidgetIds()
+        widgetIds = widgetRepository.loadWidgetIds()
     }
 
     fun refresh() {
@@ -39,12 +40,12 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     fun addWidgetId(id: Int) {
         widgetIds = widgetIds + id
-        repository.saveWidgetIds(widgetIds)
+        widgetRepository.saveWidgetIds(widgetIds)
     }
 
     fun removeWidgetId(id: Int) {
         widgetIds = widgetIds - id
-        repository.deleteAppWidgetId(id)
-        repository.saveWidgetIds(widgetIds)
+        widgetRepository.deleteAppWidgetId(id)
+        widgetRepository.saveWidgetIds(widgetIds)
     }
 }

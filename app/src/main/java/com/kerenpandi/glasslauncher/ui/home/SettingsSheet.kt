@@ -1,6 +1,8 @@
 package com.kerenpandi.glasslauncher.ui.home
 
+import android.content.Context
 import android.graphics.Point
+import android.hardware.display.Display
 import android.hardware.display.DisplayManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -44,7 +46,10 @@ fun SettingsSheet(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
-    val displays = remember { DisplayManager.getInstance(context).displays.toList() }
+    val displays: List<Display> = remember {
+        val manager = context.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
+        manager.displays.toList()
+    }
 
     Box(
         Modifier
@@ -100,37 +105,45 @@ fun SettingsSheet(
                         modifier = Modifier.padding(top = 4.dp, bottom = 6.dp)
                     )
                     displays.forEach { display ->
-                        val size = remember(display.displayId) {
-                            Point().also { display.getRealSize(it) }
-                        }
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 6.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Layar ${display.displayId} • ${size.x}×${size.y}",
-                                color = Color.White.copy(alpha = 0.9f),
-                                fontSize = 13.sp,
-                                modifier = Modifier.weight(1f)
-                            )
-                            Text(
-                                text = "Buka",
-                                color = Color(0xFFA8C8FF),
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .clickable { onLaunchSecondary(display.displayId) }
-                                    .padding(horizontal = 12.dp, vertical = 6.dp)
-                            )
-                        }
+                        DisplayRow(display = display, onLaunch = onLaunchSecondary)
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun DisplayRow(
+    display: Display,
+    onLaunch: (Int) -> Unit
+) {
+    val size = remember(display.displayId) {
+        Point().also { display.getRealSize(it) }
+    }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "Layar ${display.displayId} • ${size.x}×${size.y}",
+            color = Color.White.copy(alpha = 0.9f),
+            fontSize = 13.sp,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text = "Buka",
+            color = Color(0xFFA8C8FF),
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier
+                .clip(RoundedCornerShape(12.dp))
+                .clickable { onLaunch(display.displayId) }
+                .padding(horizontal = 12.dp, vertical = 6.dp)
+        )
     }
 }
 
