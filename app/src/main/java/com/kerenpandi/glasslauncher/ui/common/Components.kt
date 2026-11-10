@@ -2,6 +2,8 @@ package com.kerenpandi.glasslauncher.ui.common
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.LauncherApps
+import android.os.Process
 import android.net.Uri
 import android.provider.Settings
 import android.widget.Toast
@@ -131,6 +133,8 @@ fun AppIcon(
 }
 
 private fun openAppInfo(context: Context, app: AppInfo) {
+    if (openProfileAppDetails(context, app)) return
+
     try {
         context.startActivity(
             Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
@@ -138,34 +142,66 @@ private fun openAppInfo(context: Context, app: AppInfo) {
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         )
     } catch (e: Exception) {
+        Toast.makeText(context, "Tidak bisa membuka info aplikasi", Toast.LENGTH_SHORT).show()
+    }
+}
+
+/**
+ * Opens Settings for the exact Android profile represented by this launcher icon.
+ * This matters for Dual Apps, work profiles, and other secondary user profiles.
+ */
+private fun openProfileAppDetails(context: Context, app: AppInfo): Boolean {
+    return try {
+        val launcherApps = context.getSystemService(LauncherApps::class.java)
+            ?: return false
+        launcherApps.startAppDetailsActivity(
+            app.componentName,
+            app.userHandle,
+            null,
+            null
+        )
+        true
+    } catch (e: Exception) {
+        false
     }
 }
 
 private fun uninstallApp(context: Context, app: AppInfo) {
+    // A cloned/work-profile app must be managed from that profile's own app details.
+    if (app.userHandle != Process.myUserHandle()) {
+        if (openProfileAppDetails(context, app)) {
+            Toast.makeText(
+                context,
+                "Pilih Copot pemasangan di Info aplikasi profil tersebut",
+                Toast.LENGTH_LONG
+            ).show()
+            return
+        }
+        Toast.makeText(context, "Tidak bisa membuka info aplikasi profil ini", Toast.LENGTH_SHORT).show()
+        return
+    }
+
     val packageUri = Uri.fromParts("package", app.packageName, null)
     val attempts = listOf(
-        Intent(Intent.ACTION_DELETE, packageUri)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         Intent(Intent.ACTION_UNINSTALL_PACKAGE, packageUri)
-            .putExtra(Intent.EXTRA_RETURN_RESULT, true)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        Intent(Intent.ACTION_DELETE, packageUri)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     )
+
     for (intent in attempts) {
         try {
             context.startActivity(intent)
             return
         } catch (e: Exception) {
+            // Continue to the next system-supported uninstall entry point.
         }
     }
-    try {
-        context.startActivity(
-            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-                .setData(packageUri)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        )
-    } catch (e: Exception) {
-        Toast.makeText(context, "Tidak bisa membuka uninstall", Toast.LENGTH_SHORT).show()
-    }
+
+    // Last-resort fallback: expose the system app details page instead of no-op.
+    if (openProfileAppDetails(context, app)) return
+
+    Toast.makeText(context, "Tidak bisa membuka menu uninstall aplikasi", Toast.LENGTH_SHORT).show()
 }
 
 @Composable
