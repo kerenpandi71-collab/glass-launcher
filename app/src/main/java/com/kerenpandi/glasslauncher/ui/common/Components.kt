@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
+import android.widget.Toast
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -141,12 +142,29 @@ private fun openAppInfo(context: Context, app: AppInfo) {
 }
 
 private fun uninstallApp(context: Context, app: AppInfo) {
+    val packageUri = Uri.fromParts("package", app.packageName, null)
+    val attempts = listOf(
+        Intent(Intent.ACTION_DELETE, packageUri)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        Intent(Intent.ACTION_UNINSTALL_PACKAGE, packageUri)
+            .putExtra(Intent.EXTRA_RETURN_RESULT, true)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    )
+    for (intent in attempts) {
+        try {
+            context.startActivity(intent)
+            return
+        } catch (e: Exception) {
+        }
+    }
     try {
         context.startActivity(
-            Intent(Intent.ACTION_DELETE, Uri.fromParts("package", app.packageName, null))
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                .setData(packageUri)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         )
     } catch (e: Exception) {
+        Toast.makeText(context, "Tidak bisa membuka uninstall", Toast.LENGTH_SHORT).show()
     }
 }
 
