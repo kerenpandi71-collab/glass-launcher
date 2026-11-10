@@ -35,18 +35,6 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun swapApps(keyA: String, keyB: String) {
-        val list = apps.toMutableList()
-        val indexA = list.indexOfFirst { it.stableKey() == keyA }
-        val indexB = list.indexOfFirst { it.stableKey() == keyB }
-        if (indexA < 0 || indexB < 0 || indexA == indexB) return
-        val tmp = list[indexA]
-        list[indexA] = list[indexB]
-        list[indexB] = tmp
-        apps = list
-        orderStore.saveOrder(list)
-    }
-
     fun movePage(key: String, direction: Int) {
         val list = apps.toMutableList()
         val index = list.indexOfFirst { it.stableKey() == key }

@@ -57,15 +57,9 @@ fun AppIcon(
     iconSize: Dp = 52.dp,
     showLabel: Boolean = true,
     onClick: () -> Unit,
-    menuOpen: Boolean? = null,
-    onMenuOpenChange: (Boolean) -> Unit = {},
     extraMenuItems: List<AppMenuItem> = emptyList()
 ) {
-    var internalMenuOpen by remember { mutableStateOf(false) }
-    val isOpen = menuOpen ?: internalMenuOpen
-    val setOpen: (Boolean) -> Unit = { open ->
-        if (menuOpen == null) internalMenuOpen = open else onMenuOpenChange(open)
-    }
+    var menuOpen by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val bitmap = remember(app) {
         app.icon.toBitmap(96, 96).asImageBitmap()
@@ -78,7 +72,7 @@ fun AppIcon(
                 .clip(CircleShape)
                 .combinedClickable(
                     onClick = onClick,
-                    onLongClick = { setOpen(true) }
+                    onLongClick = { menuOpen = true }
                 )
                 .padding(8.dp)
         ) {
@@ -103,15 +97,15 @@ fun AppIcon(
             }
         }
         DropdownMenu(
-            expanded = isOpen,
-            onDismissRequest = { setOpen(false) },
+            expanded = menuOpen,
+            onDismissRequest = { menuOpen = false },
             containerColor = Color(0xFF141C2E)
         ) {
             extraMenuItems.forEach { item ->
                 DropdownMenuItem(
                     text = { Text(item.label, color = Color.White) },
                     onClick = {
-                        setOpen(false)
+                        menuOpen = false
                         item.action()
                     }
                 )
@@ -119,14 +113,14 @@ fun AppIcon(
             DropdownMenuItem(
                 text = { Text("Info aplikasi", color = Color.White) },
                 onClick = {
-                    setOpen(false)
+                    menuOpen = false
                     openAppInfo(context, app)
                 }
             )
             DropdownMenuItem(
                 text = { Text("Uninstall", color = Color.White) },
                 onClick = {
-                    setOpen(false)
+                    menuOpen = false
                     uninstallApp(context, app)
                 }
             )
