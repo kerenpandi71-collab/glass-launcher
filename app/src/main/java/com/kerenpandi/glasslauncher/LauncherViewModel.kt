@@ -18,12 +18,17 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     var apps by mutableStateOf<List<AppInfo>>(emptyList())
         private set
 
+    var dockApps by mutableStateOf<List<AppInfo>>(emptyList())
+        private set
+
     init {
         refresh()
     }
 
     fun refresh() {
-        apps = orderStore.applyOrder(repository.loadApps())
+        val loaded = repository.loadApps()
+        apps = orderStore.applyOrder(loaded)
+        dockApps = orderStore.applyDockOrder(loaded)
     }
 
     fun swapApps(keyA: String, keyB: String) {
@@ -56,6 +61,20 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         orderStore.saveOrder(list)
     }
 
+    fun addToDock(app: AppInfo) {
+        val key = app.stableKey()
+        if (dockApps.any { it.stableKey() == key } || dockApps.size >= DOCK_CAPACITY) return
+        val list = dockApps + app
+        dockApps = list
+        orderStore.saveDockOrder(list)
+    }
+
+    fun removeFromDock(key: String) {
+        val list = dockApps.filterNot { it.stableKey() == key }
+        dockApps = list
+        orderStore.saveDockOrder(list)
+    }
+
     fun launch(app: AppInfo) {
         repository.launch(getApplication(), app)
     }
@@ -66,5 +85,6 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     companion object {
         const val APPS_PER_PAGE = 24
+        const val DOCK_CAPACITY = 4
     }
 }

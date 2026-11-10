@@ -6,7 +6,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,7 +14,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
@@ -23,9 +21,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -57,7 +53,6 @@ import com.kerenpandi.glasslauncher.ui.common.ClockHeader
 import com.kerenpandi.glasslauncher.ui.common.GlassIconButton
 import com.kerenpandi.glasslauncher.ui.glass.GlassPanel
 import com.kerenpandi.glasslauncher.ui.glass.GlassScrim
-import com.kerenpandi.glasslauncher.ui.glass.glassSurface
 import kotlin.math.sqrt
 
 @Composable
@@ -67,12 +62,14 @@ fun HomeScreen(
     onSetWallpaper: () -> Unit
 ) {
     var settingsOpen by remember { mutableStateOf(false) }
-    var searchOpen by remember { mutableStateOf(false) }
     var dragging by remember { mutableStateOf(false) }
     var menuKey by remember { mutableStateOf<String?>(null) }
     val apps = viewModel.apps
+    val dockApps = viewModel.dockApps
     val appPages = remember(apps) { apps.chunked(LauncherViewModel.APPS_PER_PAGE) }
     val pageCount = appPages.size.coerceAtLeast(1)
+    val dockKeys = remember(dockApps) { dockApps.map { it.stableKey() }.toSet() }
+    val dockFull = dockApps.size >= LauncherViewModel.DOCK_CAPACITY
 
     Box(Modifier.fillMaxSize()) {
         GlassScrim()
@@ -113,11 +110,14 @@ fun HomeScreen(
                     AppGridPage(
                         apps = appPages[page],
                         pageCount = pageCount,
+                        dockKeys = dockKeys,
+                        dockFull = dockFull,
                         menuKey = menuKey,
                         onMenuOpen = { menuKey = it },
                         onMenuClosed = { menuKey = null },
                         onSwap = { keyA, keyB -> viewModel.swapApps(keyA, keyB) },
                         onMovePage = { key, direction -> viewModel.movePage(key, direction) },
+                        onAddToDock = { viewModel.addToDock(it) },
                         onAppClick = { viewModel.launch(it) },
                         onDraggingChanged = { dragging = it }
                     )
@@ -127,7 +127,7 @@ fun HomeScreen(
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 14.dp),
+                    .padding(bottom = 8.dp),
                 horizontalArrangement = Arrangement.Center
             ) {
                 repeat(pageCount) { index ->
@@ -144,28 +144,14 @@ fun HomeScreen(
                 }
             }
 
-            SearchBarPill(
-                onClick = {
-                    menuKey = null
-                    searchOpen = true
-                },
+            Dock(
+                apps = dockApps,
+                menuKey = menuKey,
+                onMenuOpen = { menuKey = it },
+                onMenuClosed = { menuKey = null },
+                onAppClick = { viewModel.launch(it) },
+                onRemoveFromDock = { viewModel.removeFromDock(it) },
                 modifier = Modifier.padding(bottom = 20.dp)
-            )
-        }
-
-        AnimatedVisibility(
-            visible = searchOpen,
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier.fillMaxSize()
-        ) {
-            SearchOverlay(
-                apps = apps,
-                onAppClick = {
-                    searchOpen = false
-                    viewModel.launch(it)
-                },
-                onDismiss = { searchOpen = false }
             )
         }
 
@@ -185,33 +171,6 @@ fun HomeScreen(
 }
 
 @Composable
-private fun SearchBarPill(onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(50.dp)
-            .glassSurface(shape = RoundedCornerShape(25.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 18.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center
-    ) {
-        Icon(
-            Icons.Default.Search,
-            contentDescription = "Cari",
-            tint = Color.White.copy(alpha = 0.85f),
-            modifier = Modifier.size(20.dp)
-        )
-        Spacer(Modifier.size(10.dp))
-        Text(
-            text = "Cari aplikasi atau web…",
-            color = Color.White.copy(alpha = 0.75f),
-            fontSize = 14.sp
-        )
-    }
-}
-
-@Composable
 private fun EmptyHomeHint() {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         GlassPanel(shape = RoundedCornerShape(24.dp)) {
@@ -227,14 +186,67 @@ private fun EmptyHomeHint() {
 }
 
 @Composable
+fun Dock(
+    apps: List<AppInfo>,
+    menuKey: String?,
+    onMenuOpen: (String) -> Unit,
+    onMenuClosed: () -> Unit,
+    onAppClick: (AppInfo) -> Unit,
+    onRemoveFromDock: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    GlassPanel(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(30.dp)
+    ) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (apps.isEmpty()) {
+                Text(
+                    text = "Tahan ikon di atas lalu pilih \"Tambahkan ke dock\"",
+                    color = Color.White.copy(alpha = 0.6f),
+                    fontSize = 11.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(vertical = 18.dp)
+                )
+            } else {
+                apps.forEach { app ->
+                    val appKey = app.stableKey()
+                    AppIcon(
+                        app = app,
+                        showLabel = false,
+                        onClick = { onAppClick(app) },
+                        menuOpen = menuKey == appKey,
+                        onMenuOpenChange = { open ->
+                            if (open) onMenuOpen(appKey) else onMenuClosed()
+                        },
+                        extraMenuItems = listOf(
+                            AppMenuItem("Lepas dari dock") { onRemoveFromDock(appKey) }
+                        )
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun AppGridPage(
     apps: List<AppInfo>,
     pageCount: Int,
+    dockKeys: Set<String>,
+    dockFull: Boolean,
     menuKey: String?,
     onMenuOpen: (String) -> Unit,
     onMenuClosed: () -> Unit,
     onSwap: (String, String) -> Unit,
     onMovePage: (String, Int) -> Unit,
+    onAddToDock: (AppInfo) -> Unit,
     onAppClick: (AppInfo) -> Unit,
     onDraggingChanged: (Boolean) -> Unit,
     modifier: Modifier = Modifier
@@ -263,10 +275,12 @@ fun AppGridPage(
                             draggingKey = draggingKey,
                             menuOpen = menuKey == appKey,
                             pageCount = pageCount,
+                            canAddToDock = !dockFull && appKey !in dockKeys,
                             onMenuOpen = onMenuOpen,
                             onMenuClosed = onMenuClosed,
                             onSwap = onSwap,
                             onMovePage = onMovePage,
+                            onAddToDock = onAddToDock,
                             onAppClick = onAppClick,
                             onDraggingChanged = onDraggingChanged,
                             onDragTarget = { targetKey ->
@@ -296,10 +310,12 @@ private fun DraggableAppIcon(
     draggingKey: String?,
     menuOpen: Boolean,
     pageCount: Int,
+    canAddToDock: Boolean,
     onMenuOpen: (String) -> Unit,
     onMenuClosed: () -> Unit,
     onSwap: (String, String) -> Unit,
     onMovePage: (String, Int) -> Unit,
+    onAddToDock: (AppInfo) -> Unit,
     onAppClick: (AppInfo) -> Unit,
     onDraggingChanged: (Boolean) -> Unit,
     onDragTarget: (String) -> Unit,
@@ -375,10 +391,15 @@ private fun DraggableAppIcon(
             onClick = { onAppClick(app) },
             menuOpen = menuOpen,
             onMenuOpenChange = { open -> if (open) onMenuOpen(appKey) else onMenuClosed() },
-            extraMenuItems = listOf(
-                AppMenuItem("Pindah ke halaman sebelumnya") { onMovePage(appKey, -1) },
-                AppMenuItem("Pindah ke halaman berikutnya") { onMovePage(appKey, 1) }
-            ).let { extras -> if (pageCount > 1) extras else emptyList() }
+            extraMenuItems = buildList {
+                if (canAddToDock) {
+                    add(AppMenuItem("Tambahkan ke dock") { onAddToDock(app) })
+                }
+                if (pageCount > 1) {
+                    add(AppMenuItem("Pindah ke halaman sebelumnya") { onMovePage(appKey, -1) })
+                    add(AppMenuItem("Pindah ke halaman berikutnya") { onMovePage(appKey, 1) })
+                }
+            }
         )
     }
 }

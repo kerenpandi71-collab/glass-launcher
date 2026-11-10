@@ -23,8 +23,25 @@ class OrderStore(context: Context) {
             .apply()
     }
 
+    fun applyDockOrder(loaded: List<AppInfo>): List<AppInfo> {
+        val byKey = loaded.associateBy { it.stableKey() }
+        return loadDockOrder().mapNotNull { byKey[it] }
+    }
+
+    fun saveDockOrder(apps: List<AppInfo>) {
+        prefs.edit()
+            .putString(KEY_DOCK, apps.joinToString("|") { it.stableKey() })
+            .apply()
+    }
+
     private fun loadOrder(): List<String> =
         prefs.getString(KEY_ORDER, null)
+            ?.split("|")
+            ?.filter { it.isNotBlank() }
+            .orEmpty()
+
+    private fun loadDockOrder(): List<String> =
+        prefs.getString(KEY_DOCK, null)
             ?.split("|")
             ?.filter { it.isNotBlank() }
             .orEmpty()
@@ -32,5 +49,6 @@ class OrderStore(context: Context) {
     companion object {
         private const val PREFS_NAME = "glass_launcher_home"
         private const val KEY_ORDER = "app_order"
+        private const val KEY_DOCK = "dock_order"
     }
 }
