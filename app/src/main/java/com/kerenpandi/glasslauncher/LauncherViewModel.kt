@@ -1,6 +1,5 @@
 package com.kerenpandi.glasslauncher
 
-import android.app.ActivityOptions
 import android.app.Application
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -12,17 +11,12 @@ import com.kerenpandi.glasslauncher.data.AppRepository
 class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     private val repository = AppRepository(app)
-    private val widgetRepository = (app as GlassLauncherApp).widgetRepository
 
     var apps by mutableStateOf<List<AppInfo>>(emptyList())
         private set
 
-    var widgetIds by mutableStateOf<List<Int>>(emptyList())
-        private set
-
     init {
         refresh()
-        widgetIds = widgetRepository.loadWidgetIds()
     }
 
     fun refresh() {
@@ -30,26 +24,10 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun launch(app: AppInfo) {
-        getApplication<Application>().startActivity(repository.launchIntent(app))
+        repository.launch(getApplication(), app)
     }
 
     fun launch(app: AppInfo, displayId: Int) {
-        val options = ActivityOptions.makeBasic().setLaunchDisplayId(displayId)
-        getApplication<Application>().startActivity(repository.launchIntent(app), options.toBundle())
-    }
-
-    fun addWidgetId(id: Int) {
-        widgetIds = widgetIds + id
-        widgetRepository.saveWidgetIds(widgetIds)
-    }
-
-    fun removeWidgetId(id: Int) {
-        widgetIds = widgetIds - id
-        widgetRepository.deleteAppWidgetId(id)
-        widgetRepository.saveWidgetIds(widgetIds)
-    }
-
-    fun saveWidgetSize(id: Int, widthDp: Int, heightDp: Int) {
-        widgetRepository.saveWidgetSize(id, widthDp, heightDp)
+        repository.launch(getApplication(), app, displayId)
     }
 }

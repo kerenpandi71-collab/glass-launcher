@@ -17,13 +17,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -31,7 +26,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -40,7 +34,6 @@ import com.kerenpandi.glasslauncher.ui.glass.GlassPanel
 
 @Composable
 fun SettingsSheet(
-    onAddWidget: () -> Unit,
     onOpenDesktopMode: (Int) -> Unit,
     onSetWallpaper: () -> Unit,
     onDismiss: () -> Unit
@@ -48,7 +41,7 @@ fun SettingsSheet(
     val context = LocalContext.current
     val displays: List<Display> = remember {
         val manager = context.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
-        manager.displays.toList()
+        manager.displays.filter { it.displayId != Display.DEFAULT_DISPLAY }
     }
 
     Box(
@@ -85,8 +78,7 @@ fun SettingsSheet(
                         fontWeight = FontWeight.SemiBold
                     )
                     Spacer(Modifier.height(10.dp))
-                    SettingsAction(Icons.Default.Add, "Tambah widget") { onAddWidget() }
-                    SettingsAction(null, "Pilih wallpaper") { onSetWallpaper() }
+                    SettingsAction("Pilih wallpaper") { onSetWallpaper() }
 
                     HorizontalDivider(
                         color = Color.White.copy(alpha = 0.15f),
@@ -99,11 +91,19 @@ fun SettingsSheet(
                         fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        text = "Desktop ala PC dengan taskbar di layar lain. Untuk tes tanpa monitor: Setelan → Developer options → Simulate secondary displays, lalu buka sheet ini lagi.",
+                        text = "Desktop ala PC dengan taskbar di layar kedua (display utama tidak termasuk). Untuk tes tanpa monitor: Setelan → Developer options → aktifkan Force desktop mode + Simulate secondary displays, lalu buka sheet ini lagi.",
                         color = Color.White.copy(alpha = 0.65f),
                         fontSize = 12.sp,
                         modifier = Modifier.padding(top = 4.dp, bottom = 6.dp)
                     )
+                    if (displays.isEmpty()) {
+                        Text(
+                            text = "Tidak ada layar kedua terdeteksi.",
+                            color = Color.White.copy(alpha = 0.5f),
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(vertical = 6.dp)
+                        )
+                    }
                     displays.forEach { display ->
                         DisplayRow(display = display, onLaunch = onOpenDesktopMode)
                     }
@@ -149,7 +149,6 @@ private fun DisplayRow(
 
 @Composable
 private fun SettingsAction(
-    icon: ImageVector?,
     label: String,
     onClick: () -> Unit
 ) {
@@ -161,15 +160,6 @@ private fun SettingsAction(
             .padding(vertical = 12.dp, horizontal = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        if (icon != null) {
-            Icon(
-                icon,
-                contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(Modifier.width(14.dp))
-        }
         Text(label, color = Color.White, fontSize = 15.sp)
     }
 }

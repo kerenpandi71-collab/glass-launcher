@@ -1,14 +1,16 @@
 package com.kerenpandi.glasslauncher
 
 import android.app.ActivityOptions
+import android.content.Context
 import android.content.Intent
+import android.hardware.display.DisplayManager
 import android.os.Bundle
+import android.view.Display
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import com.kerenpandi.glasslauncher.data.WidgetRepository
 import com.kerenpandi.glasslauncher.ui.home.HomeScreen
 import com.kerenpandi.glasslauncher.ui.theme.GlassTheme
 
@@ -16,34 +18,16 @@ class LauncherActivity : ComponentActivity() {
 
     private val viewModel: LauncherViewModel by viewModels()
 
-    private val widgetRepository: WidgetRepository
-        get() = (application as GlassLauncherApp).widgetRepository
-
-    private var pendingWidgetId: Int = -1
-
-    private val widgetPickerLauncher =
-        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-            val id = pendingWidgetId
-            pendingWidgetId = -1
-            if (id < 0) return@registerForActivityResult
-            val bound = result.resultCode == RESULT_OK && widgetRepository.widgetInfo(id) != null
-            if (bound) {
-                viewModel.addWidgetId(id)
-            } else {
-                widgetRepository.deleteAppWidgetId(id)
-            }
-        }
+    private var desktopPresentation: DesktopPresentation? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        widgetRepository.startListening()
         setContent {
             GlassTheme {
                 HomeScreen(
                     viewModel = viewModel,
-                    onAddWidget = { addWidget() },
-                    onOpenDesktopMode = { displayId -> launchDesktopMode(displayId) },
+                    onOpenDesktopMode = { displayId -> openDesktopMode(displayId) },
                     onSetWallpaper = { openWallpaperPicker() }
                 )
             }
@@ -56,24 +40,57 @@ class LauncherActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
-        widgetRepository.stopListening()
+        dismissDesktopMode()
         super.onDestroy()
     }
 
-    private fun addWidget() {
-        val id = widgetRepository.allocateAppWidgetId()
-        pendingWidgetId = id
-        widgetPickerLauncher.launch(widgetRepository.widgetPickerIntent(id))
+    private fun openDesktopMode(displayId: Int) {
+        if (displayId == Display.DEFAULT_DISPLAY) {
+            Toast.makeText(this, "Desktop Mode tidak aktif di layar utama", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val displayManager = getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
+        val display = displayManager.getDisplay(displayId)
+        if (display == null) {
+            Toast.makeText(this, "Layar tidak ditemukan", Toast.LENGTH_SHORT).show()
+            return
+        }
+        dismissDesktopMode()
+        val apps = viewModel.apps
+        desktopPresentation = try {
+            DesktopPresentation(
+                outerContext = this,
+                display = display,
+                apps = apps,
+                onLaunchApp = { app -> viewModel.launch(app, displayId) },
+                onDismissed = { desktopPresentation = null }
+            ).also { it.show() }
+        } catch (e: Exception) {
+            launchDesktopModeActivity(display)
+        }
     }
 
-    private fun launchDesktopMode(displayId: Int) {
-        val options = ActivityOptions.makeBasic().setLaunchDisplayId(displayId)
-        startActivity(
-            Intent(this, DesktopModeActivity::class.java)
-                .putExtra(DesktopModeActivity.EXTRA_DISPLAY_ID, displayId)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK),
-            options.toBundle()
-        )
+    private fun launchDesktopModeActivity(display: Display): DesktopPresentation? {
+        try {
+            val options = ActivityOptions.makeBasic().setLaunchDisplayId(display.displayId)
+            startActivity(
+                Intent(this, DesktopModeActivity::class.java)
+                    .putExtra(DesktopModeActivity.EXTRA_DISPLAY_ID, display.displayId)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK),
+                options.toBundle()
+            )
+        } catch (e: Exception) {
+            Toast.makeText(this, "Gagal membuka Desktop Mode", Toast.LENGTH_SHORT).show()
+        }
+        return null
+    }
+
+    private fun dismissDesktopMode() {
+        try {
+            desktopPresentation?.dismiss()
+        } catch (e: Exception) {
+        }
+        desktopPresentation = null
     }
 
     private fun openWallpaperPicker() {

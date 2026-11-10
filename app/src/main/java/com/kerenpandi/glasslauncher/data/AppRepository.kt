@@ -1,15 +1,21 @@
 package com.kerenpandi.glasslauncher.data
 
+import android.app.ActivityOptions
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.LauncherApps
 import android.graphics.drawable.Drawable
+import android.os.Process
+import android.os.UserHandle
+import android.os.UserManager
 
 data class AppInfo(
     val label: String,
     val packageName: String,
     val activityName: String,
-    val icon: Drawable
+    val icon: Drawable,
+    val userHandle: UserHandle = Process.myUserHandle()
 ) {
     val componentName: ComponentName
         get() = ComponentName(packageName, activityName)
@@ -17,20 +23,55 @@ data class AppInfo(
 
 class AppRepository(private val context: Context) {
 
+    private val launcherApps =
+        context.getSystemService(Context.LAUNCHER_APPS_SERVICE) as LauncherApps
+    private val userManager =
+        context.getSystemService(Context.USER_SERVICE) as UserManager
+
     fun loadApps(): List<AppInfo> {
-        val pm = context.packageManager
-        val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
-        return pm.queryIntentActivities(intent, 0)
-            .map {
-                AppInfo(
-                    label = it.loadLabel(pm).toString(),
-                    packageName = it.activityInfo.packageName,
-                    activityName = it.activityInfo.name,
-                    icon = it.loadIcon(pm)
-                )
+        val apps = mutableListOf<AppInfo>()
+        for (profile in userManager.userProfiles) {
+            try {
+                launcherApps.getActivityList(null, profile).forEach { activity ->
+                    val packageName = activity.componentName.packageName
+                    if (packageName == context.packageName) return@forEach
+                    apps += AppInfo(
+                        label = activity.label.toString(),
+                        packageName = packageName,
+                        activityName = activity.componentName.className,
+                        icon = activity.getBadgedIcon(0),
+                        userHandle = profile
+                    )
+                }
+            } catch (e: Exception) {
             }
-            .filter { it.packageName != context.packageName }
-            .sortedBy { it.label.lowercase() }
+        }
+        return apps.sortedBy { it.label.lowercase() }
+    }
+
+    fun launch(activityContext: Context, app: AppInfo, displayId: Int? = null) {
+        val options = displayId?.let { id ->
+            ActivityOptions.makeBasic().apply {
+                setLaunchDisplayId(id)
+                try {
+                    ActivityOptions::class.java
+                        .getMethod("setLaunchWindowingMode", Int::class.javaPrimitiveType)
+                        .invoke(this, WINDOWING_MODE_FREEFORM)
+                } catch (e: Exception) {
+                }
+            }
+        }
+        val optionsBundle = options?.toBundle()
+        try {
+            launcherApps.startMainActivity(app.componentName, app.userHandle, null, optionsBundle)
+        } catch (e: Exception) {
+            val intent = launchIntent(app)
+            try {
+                activityContext.startActivity(intent, optionsBundle)
+            } catch (e2: Exception) {
+                activityContext.startActivity(intent)
+            }
+        }
     }
 
     fun launchIntent(app: AppInfo): Intent =
@@ -38,4 +79,8 @@ class AppRepository(private val context: Context) {
             setClassName(app.packageName, app.activityName)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
+
+    companion object {
+        private const val WINDOWING_MODE_FREEFORM = 5
+    }
 }
