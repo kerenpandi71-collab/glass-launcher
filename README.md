@@ -1,16 +1,18 @@
-# Glass Launcher 🧊
+# Glass Launcher 🥤
 
-Launcher Android bertema **liquid glass** ala iOS, dibangun dengan Kotlin + Jetpack Compose.
-Dirancang ringan untuk HP entry-level (diuji menargetkan Redmi 12C / Helio G85),
-**tanpa laci aplikasi dan tanpa widget** — tampilan bersih: semua aplikasi di halaman homescreen.
+Launcher Android bertema **liquid glass** ala iOS dengan tata letak terinspirasi
+**[BlissLauncher](https://gitlab.e.foundation/e/apps/BlissLauncher)** (/e/OS), dibangun dengan
+Kotlin + Jetpack Compose. Dirancang ringan untuk HP entry-level (diuji menargetkan
+Redmi 12C / Helio G85), **tanpa laci aplikasi dan tanpa widget** — tampilan bersih:
+semua aplikasi di halaman homescreen dengan **search bar universal** di bawah.
 
 ## Fitur
 
 - **Liquid glass UI** — panel kaca transparan dengan gradient dan border highlight, tampil di atas **wallpaper sistem asli** (tanpa blur bitmap berat → hemat RAM & baterai di HP kentang).
-- **Tanpa app drawer** ala iPhone — semua aplikasi dibagi ke halaman (24 aplikasi per halaman) dengan indikator halaman; halaman tetangga di-pre-compose supaya geser halaman mulus di HP kentang.
-- **Tanpa widget** — sengaja dihapus demi tampilan bersih dan performa.
-- **Long-press ikon aplikasi** → menu glass: *Info aplikasi* dan *Uninstall*, seperti launcher pada umumnya.
-- **Dock** ala iOS dengan 4 aplikasi.
+- **Gaya BlissLauncher (/e/OS)** — search bar glass di bawah layar, **pencarian universal** (filter aplikasi live + tombol *Cari di web*), titik halaman, dan **ikon squircle** (sudut membulat khas iOS/eOS).
+- **Tanpa app drawer** — semua aplikasi dibagi ke halaman (24 aplikasi per halaman); halaman tetangga di-pre-compose supaya geser halaman mulus di HP kentang.
+- **Susun ulang ikon** — tahan lama lalu geser ikon untuk menukar posisi; tata letak **disimpan permanen** (SharedPreferences). Lepas tahan tanpa menggeser → menu terbuka.
+- **Menu long-press** — *Pindah ke halaman sebelumnya/berikutnya*, *Info aplikasi*, dan *Uninstall*, seperti launcher pada umumnya.
 - **Aplikasi clone / Dual Apps tampil** — daftar aplikasi memakai `LauncherApps` + `UserManager.userProfiles`, jadi aplikasi hasil clone (Dual Apps/Parallel, work profile) ikut muncul dengan ikon ber-badge, dan bisa diluncurkan di user-nya masing-masing.
 - **Desktop Mode** — desktop ala PC dengan **taskbar** kaca di bawah (terinspirasi [farmerbb/Taskbar](https://github.com/farmerbb/Taskbar)): tombol semua-aplikasi, aplikasi pinned, dan peluncuran aplikasi freeform bila didukung. Di-render lewat **`Presentation`** (API resmi untuk display sekunder) sehingga lebih andal di display simulasi; fallback ke activity bila Presentation gagal. **Tidak aktif di display 0 (layar utama).**
 
@@ -20,6 +22,7 @@ Dirancang ringan untuk HP entry-level (diuji menargetkan Redmi 12C / Helio G85),
 - Wallpaper tidak pernah dibuka sebagai bitmap — window launcher menampilkan wallpaper sistem langsung (overdraw minimal).
 - Ikon aplikasi di-decode sekali ke bitmap 96px dan di-cache per aplikasi.
 - Halaman pager di-pre-compose (`beyondViewportPageCount = 1`) supaya geser tidak kaku.
+- Grid halaman memakai layout biasa (bukan lazy) — maksimal 24 item per halaman, lebih ringan.
 
 ## Cara Build
 
@@ -51,15 +54,16 @@ app/src/main/java/com/kerenpandi/glasslauncher/
 ├── LauncherActivity.kt          # HOME activity utama + pengelola Desktop Mode
 ├── DesktopPresentation.kt       # Desktop Mode di layar kedua (Presentation API)
 ├── DesktopModeActivity.kt       # Fallback Desktop Mode via activity
-├── LauncherViewModel.kt         # State daftar aplikasi
+├── LauncherViewModel.kt         # State daftar aplikasi + urutan & tata letak
 ├── data/
-│   └── AppRepository.kt         # LauncherApps: aplikasi semua profil + peluncuran
+│   ├── AppRepository.kt         # LauncherApps: aplikasi semua profil + peluncuran
+│   └── OrderStore.kt            # Penyimpanan urutan ikon homescreen
 └── ui/
     ├── theme/Theme.kt           # GlassTheme (dark + transparan)
     ├── glass/Glass.kt           # glassSurface, GlassPanel, GlassScrim, DesktopBackdrop
-    ├── common/Components.kt     # AppIcon (long-press menu), ClockHeader, GlassIconButton
+    ├── common/Components.kt     # AppIcon (squircle + long-press menu), ClockHeader, GlassIconButton
     ├── desktop/DesktopUi.kt     # DesktopScreen, Taskbar, AllAppsPanel
-    └── home/                    # HomeScreen, SettingsSheet
+    └── home/                    # HomeScreen, SearchOverlay, SettingsSheet
 ```
 
 ## Lisensi

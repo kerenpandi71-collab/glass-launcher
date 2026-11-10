@@ -7,10 +7,13 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import com.kerenpandi.glasslauncher.data.AppInfo
 import com.kerenpandi.glasslauncher.data.AppRepository
+import com.kerenpandi.glasslauncher.data.OrderStore
+import com.kerenpandi.glasslauncher.data.stableKey
 
 class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     private val repository = AppRepository(app)
+    private val orderStore = OrderStore(app)
 
     var apps by mutableStateOf<List<AppInfo>>(emptyList())
         private set
@@ -20,7 +23,37 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun refresh() {
-        apps = repository.loadApps()
+        apps = orderStore.applyOrder(repository.loadApps())
+    }
+
+    fun swapApps(keyA: String, keyB: String) {
+        val list = apps.toMutableList()
+        val indexA = list.indexOfFirst { it.stableKey() == keyA }
+        val indexB = list.indexOfFirst { it.stableKey() == keyB }
+        if (indexA < 0 || indexB < 0 || indexA == indexB) return
+        val tmp = list[indexA]
+        list[indexA] = list[indexB]
+        list[indexB] = tmp
+        apps = list
+        orderStore.saveOrder(list)
+    }
+
+    fun movePage(key: String, direction: Int) {
+        val list = apps.toMutableList()
+        val index = list.indexOfFirst { it.stableKey() == key }
+        if (index < 0) return
+        val page = index / APPS_PER_PAGE
+        val targetPage = page + direction
+        if (targetPage < 0) return
+        val item = list.removeAt(index)
+        val newIndex = if (direction > 0) {
+            ((targetPage + 1) * APPS_PER_PAGE - 1).coerceAtMost(list.size - 1)
+        } else {
+            (targetPage * APPS_PER_PAGE).coerceAtMost(list.size - 1)
+        }
+        list.add(newIndex.coerceAtLeast(0), item)
+        apps = list
+        orderStore.saveOrder(list)
     }
 
     fun launch(app: AppInfo) {
@@ -29,5 +62,9 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     fun launch(app: AppInfo, displayId: Int) {
         repository.launch(getApplication(), app, displayId)
+    }
+
+    companion object {
+        const val APPS_PER_PAGE = 24
     }
 }

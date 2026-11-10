@@ -21,6 +21,9 @@ data class AppInfo(
         get() = ComponentName(packageName, activityName)
 }
 
+fun AppInfo.stableKey(): String =
+    "${userHandle.hashCode()}/${componentName.flattenToString()}"
+
 class AppRepository(private val context: Context) {
 
     private val launcherApps =

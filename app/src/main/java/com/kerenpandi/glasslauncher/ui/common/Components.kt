@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -48,15 +49,24 @@ import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
+data class AppMenuItem(val label: String, val action: () -> Unit)
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun AppIcon(
     app: AppInfo,
     iconSize: Dp = 52.dp,
     showLabel: Boolean = true,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    menuOpen: Boolean? = null,
+    onMenuOpenChange: (Boolean) -> Unit = {},
+    extraMenuItems: List<AppMenuItem> = emptyList()
 ) {
-    var menuOpen by remember { mutableStateOf(false) }
+    var internalMenuOpen by remember { mutableStateOf(false) }
+    val isOpen = menuOpen ?: internalMenuOpen
+    val setOpen: (Boolean) -> Unit = { open ->
+        if (menuOpen == null) internalMenuOpen = open else onMenuOpenChange(open)
+    }
     val context = LocalContext.current
     val bitmap = remember(app) {
         app.icon.toBitmap(96, 96).asImageBitmap()
@@ -69,7 +79,7 @@ fun AppIcon(
                 .clip(CircleShape)
                 .combinedClickable(
                     onClick = onClick,
-                    onLongClick = { menuOpen = true }
+                    onLongClick = { setOpen(true) }
                 )
                 .padding(8.dp)
         ) {
@@ -77,7 +87,9 @@ fun AppIcon(
                 bitmap = bitmap,
                 contentDescription = app.label,
                 contentScale = ContentScale.Fit,
-                modifier = Modifier.size(iconSize)
+                modifier = Modifier
+                    .size(iconSize)
+                    .clip(RoundedCornerShape(iconSize * 0.28f))
             )
             if (showLabel) {
                 Text(
@@ -94,21 +106,30 @@ fun AppIcon(
             }
         }
         DropdownMenu(
-            expanded = menuOpen,
-            onDismissRequest = { menuOpen = false },
+            expanded = isOpen,
+            onDismissRequest = { setOpen(false) },
             containerColor = Color(0xFF141C2E)
         ) {
+            extraMenuItems.forEach { item ->
+                DropdownMenuItem(
+                    text = { Text(item.label, color = Color.White) },
+                    onClick = {
+                        setOpen(false)
+                        item.action()
+                    }
+                )
+            }
             DropdownMenuItem(
                 text = { Text("Info aplikasi", color = Color.White) },
                 onClick = {
-                    menuOpen = false
+                    setOpen(false)
                     openAppInfo(context, app)
                 }
             )
             DropdownMenuItem(
                 text = { Text("Uninstall", color = Color.White) },
                 onClick = {
-                    menuOpen = false
+                    setOpen(false)
                     uninstallApp(context, app)
                 }
             )
