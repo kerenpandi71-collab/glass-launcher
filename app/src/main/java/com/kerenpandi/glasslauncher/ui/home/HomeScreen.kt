@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalView
@@ -62,6 +63,7 @@ fun HomeScreen(
     onSetWallpaper: () -> Unit
 ) {
     var settingsOpen by remember { mutableStateOf(false) }
+    var recentOpen by remember { mutableStateOf(false) }
     var selectedFolder by remember { mutableStateOf<LauncherFolder?>(null) }
     var folderPickerApp by remember { mutableStateOf<AppInfo?>(null) }
     var createFolderApp by remember { mutableStateOf<AppInfo?>(null) }
@@ -87,7 +89,7 @@ fun HomeScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Spacer(Modifier.size(44.dp))
+                TextButton(onClick = { recentOpen = true }) { Text("Recent", color = Color.White) }
                 ClockHeader()
                 GlassIconButton(
                     icon = Icons.Default.Settings,
@@ -151,7 +153,7 @@ fun HomeScreen(
         }
     }
 
-    selectedFolder?.let { folder ->
+    if (recentOpen) RecentAppsDialog(onDismiss = { recentOpen = false })\n\n    selectedFolder?.let { folder ->
         FolderDialog(
             folder = folders.firstOrNull { it.id == folder.id } ?: folder,
             allApps = apps,
