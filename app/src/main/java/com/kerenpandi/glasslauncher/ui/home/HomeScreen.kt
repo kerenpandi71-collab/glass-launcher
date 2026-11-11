@@ -11,6 +11,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -62,8 +65,10 @@ fun HomeScreen(
     val dockApps = viewModel.dockApps
     val folders = viewModel.folders
     val folderedKeys = remember(folders) { folders.flatMap { it.appKeys }.toSet() }
-    val appEntries = apps.filterNot { it.stableKey() in folderedKeys }.map { HomeEntry.App(it) }
-    val entries = appEntries + folders.map { HomeEntry.Folder(it) }
+    val entries = remember(apps, folders) {
+        apps.filterNot { it.stableKey() in folderedKeys }.map { HomeEntry.App(it) } +
+            folders.map { HomeEntry.Folder(it) }
+    }
     val pages = remember(entries) { entries.chunked(LauncherViewModel.APPS_PER_PAGE) }
     val pageCount = pages.size.coerceAtLeast(1)
     val dockKeys = remember(dockApps) { dockApps.map { it.stableKey() }.toSet() }
@@ -89,7 +94,8 @@ fun HomeScreen(
             val pagerState = rememberPagerState(pageCount = { pageCount })
             HorizontalPager(
                 state = pagerState,
-                beyondViewportPageCount = 1,
+                beyondViewportPageCount = 0,
+                userScrollEnabled = pageCount > 1,
                 modifier = Modifier.weight(1f).padding(vertical = 12.dp)
             ) { page ->
                 if (entries.isEmpty()) EmptyHomeHint()
@@ -493,11 +499,20 @@ private fun CreateFolderDialog(
                 Text("Pilih aplikasi kedua untuk digabung dengan ${firstApp.label}.")
                 OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Nama folder") }, singleLine = true)
                 Spacer(Modifier.height(8.dp))
-                Column(Modifier.heightIn(max = 280.dp).fillMaxWidth()) {
-                    apps.forEach { app ->
-                        TextButton(onClick = { onCreate(app, name) }, modifier = Modifier.fillMaxWidth()) {
-                            Text(app.label, modifier = Modifier.fillMaxWidth())
-                        }
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(3),
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp),
+                    contentPadding = PaddingValues(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(apps, key = { it.stableKey() }) { app ->
+                        AppIcon(
+                            app = app,
+                            iconSize = 48.dp,
+                            onClick = { onCreate(app, name) },
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
                 }
             }
