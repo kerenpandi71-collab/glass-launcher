@@ -153,7 +153,9 @@ fun HomeScreen(
         }
     }
 
-    if (recentOpen) RecentAppsDialog(onDismiss = { recentOpen = false })\n\n    selectedFolder?.let { folder ->
+    if (recentOpen) RecentAppsDialog(onDismiss = { recentOpen = false })
+
+    selectedFolder?.let { folder ->
         FolderDialog(
             folder = folders.firstOrNull { it.id == folder.id } ?: folder,
             allApps = apps,
