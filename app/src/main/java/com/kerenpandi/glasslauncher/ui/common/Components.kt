@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
+import com.kerenpandi.glasslauncher.ShizukuActions
 import com.kerenpandi.glasslauncher.data.AppInfo
 import com.kerenpandi.glasslauncher.data.stableKey
 import com.kerenpandi.glasslauncher.ui.glass.glassSurface
@@ -132,7 +133,7 @@ fun AppIcon(
                 text = { Text("Hentikan aplikasi", color = Color.White) },
                 onClick = {
                     menuOpen = false
-                    stopAppBackground(context, app)
+                    ShizukuActions.stopApp(context, app.packageName)
                 }
             )
             DropdownMenuItem(
@@ -150,20 +151,6 @@ fun AppIcon(
                 }
             )
         }
-    }
-}
-
-private fun stopAppBackground(context: Context, app: AppInfo) {
-    if (app.userHandle != Process.myUserHandle()) {
-        Toast.makeText(context, "Penghentian aplikasi profil lain tidak didukung", Toast.LENGTH_SHORT).show()
-        return
-    }
-    try {
-        val manager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-        manager.killBackgroundProcesses(app.packageName)
-        Toast.makeText(context, "Permintaan menghentikan proses latar dikirim", Toast.LENGTH_SHORT).show()
-    } catch (e: Exception) {
-        Toast.makeText(context, "Tidak dapat menghentikan proses aplikasi", Toast.LENGTH_SHORT).show()
     }
 }
 
