@@ -128,7 +128,11 @@ fun HomeScreen(
             exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
             modifier = Modifier.fillMaxSize()
         ) {
-            SettingsSheet(onOpenDesktopMode, onSetWallpaper) { settingsOpen = false }
+            SettingsSheet(
+                onOpenDesktopMode = onOpenDesktopMode,
+                onSetWallpaper = onSetWallpaper,
+                onDismiss = { settingsOpen = false }
+            )
         }
     }
 
@@ -198,7 +202,7 @@ fun Dock(
 }
 
 @Composable
-fun AppGridPage(
+private fun AppGridPage(
     entries: List<HomeEntry>,
     pageCount: Int,
     dockKeys: Set<String>,
@@ -237,6 +241,7 @@ fun AppGridPage(
                             )
                         }
                         is HomeEntry.Folder -> FolderTile(
+                            modifier = Modifier.weight(1f),
                             folder = entry.info,
                             onClick = { onOpenFolder(entry.info) },
                             onRename = { name -> onRenameFolder(entry.info, name) },
@@ -255,6 +260,7 @@ private fun appsCanMakeFolder(entries: List<HomeEntry>, folders: List<LauncherFo
 
 @Composable
 private fun FolderTile(
+    modifier: Modifier = Modifier,
     folder: LauncherFolder,
     onClick: () -> Unit,
     onRename: (String) -> Unit,
@@ -263,7 +269,7 @@ private fun FolderTile(
     var menuOpen by remember { mutableStateOf(false) }
     var renameOpen by remember { mutableStateOf(false) }
     var name by remember(folder.name) { mutableStateOf(folder.name) }
-    Box(Modifier.weight(1f).padding(horizontal = 4.dp)) {
+    Box(modifier.padding(horizontal = 4.dp)) {
         Column(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
                 .combinedClickable(onClick = onClick, onLongClick = { menuOpen = true })
