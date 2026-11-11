@@ -1,6 +1,5 @@
 package com.kerenpandi.glasslauncher.data
 
-import android.app.ActivityOptions
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -52,28 +51,11 @@ class AppRepository(private val context: Context) {
         return apps.sortedBy { it.label.lowercase() }
     }
 
-    fun launch(activityContext: Context, app: AppInfo, displayId: Int? = null) {
-        val options = displayId?.let { id ->
-            ActivityOptions.makeBasic().apply {
-                setLaunchDisplayId(id)
-                try {
-                    ActivityOptions::class.java
-                        .getMethod("setLaunchWindowingMode", Int::class.javaPrimitiveType)
-                        .invoke(this, WINDOWING_MODE_FREEFORM)
-                } catch (e: Exception) {
-                }
-            }
-        }
-        val optionsBundle = options?.toBundle()
+    fun launch(activityContext: Context, app: AppInfo) {
         try {
-            launcherApps.startMainActivity(app.componentName, app.userHandle, null, optionsBundle)
+            launcherApps.startMainActivity(app.componentName, app.userHandle, null, null)
         } catch (e: Exception) {
-            val intent = launchIntent(app)
-            try {
-                activityContext.startActivity(intent, optionsBundle)
-            } catch (e2: Exception) {
-                activityContext.startActivity(intent)
-            }
+            activityContext.startActivity(launchIntent(app))
         }
     }
 
@@ -83,7 +65,4 @@ class AppRepository(private val context: Context) {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
 
-    companion object {
-        private const val WINDOWING_MODE_FREEFORM = 5
-    }
 }
