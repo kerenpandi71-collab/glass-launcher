@@ -5,6 +5,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -191,7 +192,7 @@ fun Dock(
     onRemoveFromDock: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    GlassPanel(modifier.fillMaxWidth(), shape = RoundedCornerShape(30.dp)) {
+    GlassPanel(modifier = modifier.fillMaxWidth(), shape = RoundedCornerShape(30.dp)) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
             if (apps.isEmpty()) {
@@ -265,6 +266,7 @@ private fun AppGridPage(
 private fun appsCanMakeFolder(entries: List<HomeEntry>, app: AppInfo): Boolean =
     entries.any { it is HomeEntry.App && it.info.stableKey() != app.stableKey() }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun FolderTile(
     modifier: Modifier = Modifier,
