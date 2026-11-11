@@ -64,15 +64,3 @@ fun GlassScrim(
     )
 }
 
-@Composable
-fun DesktopBackdrop(modifier: Modifier = Modifier) {
-    Box(
-        modifier
-            .fillMaxSize()
-            .background(
-                Brush.linearGradient(
-                    listOf(Color(0xFF0A1120), Color(0xFF16233D), Color(0xFF0A1120))
-                )
-            )
-    )
-}
