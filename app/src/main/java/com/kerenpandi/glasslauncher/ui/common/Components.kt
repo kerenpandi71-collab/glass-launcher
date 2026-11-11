@@ -7,6 +7,7 @@ import android.os.Process
 import android.net.Uri
 import android.provider.Settings
 import android.widget.Toast
+import android.util.LruCache
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -32,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -44,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
 import com.kerenpandi.glasslauncher.data.AppInfo
+import com.kerenpandi.glasslauncher.data.stableKey
 import com.kerenpandi.glasslauncher.ui.glass.glassSurface
 import kotlinx.coroutines.delay
 import java.time.LocalDate
@@ -52,6 +55,18 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 data class AppMenuItem(val label: String, val action: () -> Unit)
+
+private val appIconCache = object : LruCache<String, ImageBitmap>(2 * 1024 * 1024) {
+    override fun sizeOf(key: String, value: ImageBitmap): Int =
+        value.width * value.height * 4
+}
+
+fun cachedAppIcon(app: AppInfo, sizePx: Int): ImageBitmap {
+    val key = "${app.stableKey()}:$sizePx"
+    return appIconCache.get(key) ?: app.icon.toBitmap(sizePx, sizePx)
+        .asImageBitmap()
+        .also { appIconCache.put(key, it) }
+}
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -65,9 +80,7 @@ fun AppIcon(
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     val context = LocalContext.current
-    val bitmap = remember(app) {
-        app.icon.toBitmap(96, 96).asImageBitmap()
-    }
+    val bitmap = remember(app.stableKey()) { cachedAppIcon(app, 96) }
     Box(modifier = modifier) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
