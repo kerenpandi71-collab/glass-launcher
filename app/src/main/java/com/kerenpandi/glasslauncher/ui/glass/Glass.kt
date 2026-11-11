@@ -22,7 +22,7 @@ fun Modifier.glassSurface(
         .clip(shape)
         .background(
             Brush.verticalGradient(
-                colors = listOf(tint.copy(alpha = 0.22f), tint.copy(alpha = 0.07f))
+                colors = listOf(tint.copy(alpha = 0.30f), tint.copy(alpha = 0.10f))
             )
         )
         .border(
