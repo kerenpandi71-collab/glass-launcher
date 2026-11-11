@@ -5,6 +5,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.kerenpandi.glasslauncher.data.AppInfo
 import com.kerenpandi.glasslauncher.data.AppRepository
 import com.kerenpandi.glasslauncher.data.LauncherFolder
@@ -16,6 +21,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     private val repository = AppRepository(app)
     private val orderStore = OrderStore(app)
+    private var refreshJob: Job? = null
 
     var apps by mutableStateOf<List<AppInfo>>(emptyList())
         private set
@@ -27,11 +33,14 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     init { refresh() }
 
     fun refresh() {
-        val loaded = repository.loadApps()
-        apps = orderStore.applyOrder(loaded)
-        dockApps = if (orderStore.hasDockOrder()) orderStore.applyDockOrder(loaded)
-            else apps.take(DOCK_CAPACITY)
-        folders = orderStore.loadFolders(loaded)
+        refreshJob?.cancel()
+        refreshJob = viewModelScope.launch {
+            val loaded = withContext(Dispatchers.IO) { repository.loadApps() }
+            apps = orderStore.applyOrder(loaded)
+            dockApps = if (orderStore.hasDockOrder()) orderStore.applyDockOrder(loaded)
+                else apps.take(DOCK_CAPACITY)
+            folders = orderStore.loadFolders(loaded)
+        }
     }
 
     fun movePage(key: String, direction: Int) {
@@ -105,7 +114,6 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun launch(app: AppInfo) { repository.launch(getApplication(), app) }
-    fun launch(app: AppInfo, displayId: Int) { repository.launch(getApplication(), app, displayId) }
 
     companion object {
         const val APPS_PER_PAGE = 24
