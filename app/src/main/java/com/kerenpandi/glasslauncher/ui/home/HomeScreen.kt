@@ -50,7 +50,6 @@ private sealed interface HomeEntry {
 @Composable
 fun HomeScreen(
     viewModel: LauncherViewModel,
-    onOpenDesktopMode: (Int) -> Unit,
     onSetWallpaper: () -> Unit
 ) {
     var settingsOpen by remember { mutableStateOf(false) }
@@ -64,7 +63,7 @@ fun HomeScreen(
     val folderedKeys = remember(folders) { folders.flatMap { it.appKeys }.toSet() }
     val appEntries = apps.filterNot { it.stableKey() in folderedKeys }.map { HomeEntry.App(it) }
     val entries = appEntries + folders.map { HomeEntry.Folder(it) }
-    val pages = entries.chunked(LauncherViewModel.APPS_PER_PAGE)
+    val pages = remember(entries) { entries.chunked(LauncherViewModel.APPS_PER_PAGE) }
     val pageCount = pages.size.coerceAtLeast(1)
     val dockKeys = remember(dockApps) { dockApps.map { it.stableKey() }.toSet() }
     val dockFull = dockApps.size >= LauncherViewModel.DOCK_CAPACITY
@@ -135,7 +134,6 @@ fun HomeScreen(
             modifier = Modifier.fillMaxSize()
         ) {
             SettingsSheet(
-                onOpenDesktopMode = onOpenDesktopMode,
                 onSetWallpaper = onSetWallpaper,
                 onDismiss = { settingsOpen = false }
             )
@@ -336,40 +334,118 @@ private fun FolderDialog(
     onAdd: (AppInfo) -> Unit
 ) {
     var name by remember(folder.id, folder.name) { mutableStateOf(folder.name) }
+    var editingName by remember { mutableStateOf(false) }
     var addMode by remember { mutableStateOf(false) }
     val members = allApps.filter { it.stableKey() in folder.appKeys }
     val available = allApps.filter { app ->
         folders.none { f -> app.stableKey() in f.appKeys } && app.stableKey() !in folder.appKeys
     }
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(shape = RoundedCornerShape(28.dp), color = Color(0xF21B2638)) {
-            Column(Modifier.fillMaxWidth().padding(18.dp)) {
-                OutlinedTextField(value = name, onValueChange = { name = it }, singleLine = true,
-                    modifier = Modifier.fillMaxWidth(), label = { Text("Nama folder") })
-                Spacer(Modifier.height(12.dp))
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        )
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(0.88f).heightIn(max = 560.dp),
+            shape = RoundedCornerShape(32.dp),
+            color = Color(0xF21B2638),
+            tonalElevation = 12.dp,
+            shadowElevation = 24.dp
+        ) {
+            Column(
+                Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                if (editingName) {
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        singleLine = true,
+                        label = { Text("Nama folder") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = { editingName = false; name = folder.name }) { Text("Batal") }
+                        TextButton(onClick = { onRename(name); editingName = false }) { Text("Simpan") }
+                    }
+                } else {
+                    Text(
+                        text = folder.name,
+                        color = Color.White,
+                        fontSize = 17.sp,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                        modifier = Modifier.clip(RoundedCornerShape(10.dp))
+                            .clickable { editingName = true }
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    )
+                }
+
+                Spacer(Modifier.height(18.dp))
+
                 if (addMode) {
-                    Text("Pilih aplikasi", color = Color.White, fontSize = 14.sp)
-                    available.forEach { app ->
-                        TextButton(onClick = { onAdd(app); addMode = false },
-                            modifier = Modifier.fillMaxWidth()) {
-                            Text(app.label, color = Color.White, textAlign = TextAlign.Start,
-                                modifier = Modifier.fillMaxWidth())
+                    Text("Tambah aplikasi", color = Color.White, fontSize = 14.sp)
+                    Spacer(Modifier.height(8.dp))
+                    Column(
+                        Modifier.fillMaxWidth().weight(1f, fill = false)
+                            .heightIn(max = 350.dp)
+                            .verticalScroll(androidx.compose.foundation.rememberScrollState())
+                    ) {
+                        available.forEach { app ->
+                            Row(
+                                Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
+                                    .clickable { onAdd(app); addMode = false }
+                                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                AppIcon(app = app, iconSize = 38.dp, showLabel = false, onClick = {
+                                    onAdd(app); addMode = false
+                                })
+                                Text(app.label, color = Color.White, fontSize = 14.sp,
+                                    modifier = Modifier.weight(1f).padding(start = 12.dp))
+                                Text("Tambah", color = Color(0xFFA8C8FF), fontSize = 12.sp)
+                            }
                         }
                     }
                     TextButton(onClick = { addMode = false }) { Text("Kembali") }
                 } else {
-                    val rows = members.chunked(3)
-                    rows.forEach { row ->
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                            row.forEach { app ->
-                                AppIcon(app = app, iconSize = 42.dp, onClick = { onLaunch(app) },
-                                    extraMenuItems = listOf(AppMenuItem("Keluarkan dari folder") { onRemove(app) }))
+                    Column(
+                        Modifier.fillMaxWidth().weight(1f, fill = false)
+                            .heightIn(max = 390.dp)
+                            .verticalScroll(androidx.compose.foundation.rememberScrollState())
+                    ) {
+                        members.chunked(3).forEach { row ->
+                            Row(
+                                Modifier.fillMaxWidth().padding(vertical = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceEvenly,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                row.forEach { app ->
+                                    Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                                        AppIcon(
+                                            app = app,
+                                            iconSize = 50.dp,
+                                            onClick = { onLaunch(app) },
+                                            extraMenuItems = listOf(
+                                                AppMenuItem("Keluarkan dari folder") { onRemove(app) }
+                                            )
+                                        )
+                                    }
+                                }
+                                repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
                             }
                         }
                     }
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Spacer(Modifier.height(12.dp))
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         TextButton(onClick = { addMode = true }) { Text("Tambah aplikasi") }
-                        TextButton(onClick = { onRename(name); onDismiss() }) { Text("Simpan") }
+                        TextButton(onClick = onDismiss) { Text("Selesai") }
                     }
                 }
             }
