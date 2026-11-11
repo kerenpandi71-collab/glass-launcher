@@ -9,6 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -21,11 +22,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.core.graphics.drawable.toBitmap
 import com.kerenpandi.glasslauncher.LauncherViewModel
 import com.kerenpandi.glasslauncher.data.AppInfo
 import com.kerenpandi.glasslauncher.data.LauncherFolder
@@ -90,6 +94,7 @@ fun HomeScreen(
                 if (entries.isEmpty()) EmptyHomeHint()
                 else AppGridPage(
                     entries = pages[page],
+                    allApps = apps,
                     pageCount = pageCount,
                     dockKeys = dockKeys,
                     dockFull = dockFull,
@@ -204,6 +209,7 @@ fun Dock(
 @Composable
 private fun AppGridPage(
     entries: List<HomeEntry>,
+    allApps: List<AppInfo>,
     pageCount: Int,
     dockKeys: Set<String>,
     dockFull: Boolean,
@@ -235,7 +241,7 @@ private fun AppGridPage(
                                         add(AppMenuItem("Pindah ke halaman sebelumnya") { onMovePage(key, -1) })
                                         add(AppMenuItem("Pindah ke halaman berikutnya") { onMovePage(key, 1) })
                                     }
-                                    if (appsCanMakeFolder(entries, folders, app)) add(AppMenuItem("Buat folder dengan aplikasi lain") { onCreateFolder(app) })
+                                    if (appsCanMakeFolder(entries, app)) add(AppMenuItem("Buat folder dengan aplikasi lain") { onCreateFolder(app) })
                                     if (folders.isNotEmpty()) add(AppMenuItem("Pindahkan ke folder") { onMoveToFolder(app) })
                                 }
                             )
@@ -243,6 +249,7 @@ private fun AppGridPage(
                         is HomeEntry.Folder -> FolderTile(
                             modifier = Modifier.weight(1f),
                             folder = entry.info,
+                            allApps = allApps,
                             onClick = { onOpenFolder(entry.info) },
                             onRename = { name -> onRenameFolder(entry.info, name) },
                             onDelete = { onDeleteFolder(entry.info) }
@@ -255,13 +262,14 @@ private fun AppGridPage(
     }
 }
 
-private fun appsCanMakeFolder(entries: List<HomeEntry>, folders: List<LauncherFolder>, app: AppInfo): Boolean =
+private fun appsCanMakeFolder(entries: List<HomeEntry>, app: AppInfo): Boolean =
     entries.any { it is HomeEntry.App && it.info.stableKey() != app.stableKey() }
 
 @Composable
 private fun FolderTile(
     modifier: Modifier = Modifier,
     folder: LauncherFolder,
+    allApps: List<AppInfo>,
     onClick: () -> Unit,
     onRename: (String) -> Unit,
     onDelete: () -> Unit
@@ -269,6 +277,8 @@ private fun FolderTile(
     var menuOpen by remember { mutableStateOf(false) }
     var renameOpen by remember { mutableStateOf(false) }
     var name by remember(folder.name) { mutableStateOf(folder.name) }
+    val appByKey = remember(allApps) { allApps.associateBy { it.stableKey() } }
+    val previewApps = folder.appKeys.take(4).mapNotNull { appByKey[it] }
     Box(modifier.padding(horizontal = 4.dp)) {
         Column(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
@@ -278,13 +288,15 @@ private fun FolderTile(
         ) {
             GlassPanel(shape = RoundedCornerShape(18.dp)) {
                 Column(Modifier.size(64.dp).padding(7.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    folder.appKeys.take(4).chunked(2).forEach { row ->
+                    previewApps.chunked(2).forEach { row ->
                         Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                            row.forEach { key ->
-                                Box(Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(5.dp)).background(Color.White.copy(alpha = 0.18f)),
-                                    contentAlignment = Alignment.Center) {
-                                    Text("•", color = Color.White, fontSize = 13.sp)
-                                }
+                            row.forEach { app ->
+                                Image(
+                                    bitmap = remember(app) { app.icon.toBitmap(48, 48).asImageBitmap() },
+                                    contentDescription = app.label,
+                                    contentScale = ContentScale.Fit,
+                                    modifier = Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(5.dp))
+                                )
                             }
                             if (row.size == 1) Spacer(Modifier.weight(1f))
                         }
