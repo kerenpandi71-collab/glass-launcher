@@ -380,14 +380,14 @@ private fun FolderDialog(
                     androidx.compose.ui.graphics.Brush.verticalGradient(
                         listOf(Color.White.copy(alpha = 0.30f), Color(0x222A4564))
                     )
+                ).border(
+                    width = 1.dp,
+                    brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                        listOf(Color.White.copy(alpha = 0.72f), Color.White.copy(alpha = 0.12f))
+                    ),
+                    shape = RoundedCornerShape(32.dp)
                 ).padding(horizontal = 18.dp, vertical = 20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
-            ).border(
-                width = 1.dp,
-                brush = androidx.compose.ui.graphics.Brush.verticalGradient(
-                    listOf(Color.White.copy(alpha = 0.72f), Color.White.copy(alpha = 0.12f))
-                ),
-                shape = RoundedCornerShape(32.dp)
             ) {
                 if (editingName) {
                     OutlinedTextField(
