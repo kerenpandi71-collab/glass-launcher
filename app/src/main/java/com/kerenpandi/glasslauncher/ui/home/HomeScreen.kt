@@ -93,8 +93,7 @@ fun HomeScreen(
             val pagerState = rememberPagerState(pageCount = { pageCount })
             HorizontalPager(
                 state = pagerState,
-                beyondViewportPageCount = 0,
-                userScrollEnabled = pageCount > 1,
+                beyondViewportPageCount = 1,
                 modifier = Modifier.weight(1f).padding(vertical = 12.dp)
             ) { page ->
                 if (entries.isEmpty()) EmptyHomeHint()
@@ -135,8 +134,8 @@ fun HomeScreen(
 
         AnimatedVisibility(
             visible = settingsOpen,
-            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+            enter = slideInVertically(initialOffsetY = { -it / 3 }) + fadeIn(),
+            exit = slideOutVertically(targetOffsetY = { -it / 3 }) + fadeOut(),
             modifier = Modifier.fillMaxSize()
         ) {
             SettingsSheet(
@@ -357,12 +356,16 @@ private fun FolderDialog(
         Surface(
             modifier = Modifier.fillMaxWidth(0.88f).heightIn(max = 560.dp),
             shape = RoundedCornerShape(32.dp),
-            color = Color(0xF21B2638),
-            tonalElevation = 12.dp,
-            shadowElevation = 24.dp
+            color = Color(0xA91B2638),
+            tonalElevation = 2.dp,
+            shadowElevation = 30.dp
         ) {
             Column(
-                Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 20.dp),
+                Modifier.fillMaxWidth().background(
+                    androidx.compose.ui.graphics.Brush.verticalGradient(
+                        listOf(Color.White.copy(alpha = 0.13f), Color(0x66121C30))
+                    )
+                ).padding(horizontal = 18.dp, vertical = 20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 if (editingName) {
