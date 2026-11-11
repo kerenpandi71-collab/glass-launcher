@@ -27,14 +27,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import androidx.core.graphics.drawable.toBitmap
 import com.kerenpandi.glasslauncher.LauncherViewModel
 import com.kerenpandi.glasslauncher.data.AppInfo
 import com.kerenpandi.glasslauncher.data.LauncherFolder
@@ -42,6 +40,7 @@ import com.kerenpandi.glasslauncher.data.stableKey
 import com.kerenpandi.glasslauncher.ui.common.AppIcon
 import com.kerenpandi.glasslauncher.ui.common.AppMenuItem
 import com.kerenpandi.glasslauncher.ui.common.ClockHeader
+import com.kerenpandi.glasslauncher.ui.common.cachedAppIcon
 import com.kerenpandi.glasslauncher.ui.common.GlassIconButton
 import com.kerenpandi.glasslauncher.ui.glass.GlassPanel
 import com.kerenpandi.glasslauncher.ui.glass.GlassScrim
@@ -299,7 +298,7 @@ private fun FolderTile(
                         Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
                             row.forEach { app ->
                                 Image(
-                                    bitmap = remember(app) { app.icon.toBitmap(48, 48).asImageBitmap() },
+                                    bitmap = remember(app.stableKey()) { cachedAppIcon(app, 48) },
                                     contentDescription = app.label,
                                     contentScale = ContentScale.Fit,
                                     modifier = Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(5.dp))
