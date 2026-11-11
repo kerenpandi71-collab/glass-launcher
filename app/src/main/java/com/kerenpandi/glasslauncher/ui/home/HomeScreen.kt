@@ -30,6 +30,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.border
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
@@ -363,24 +364,30 @@ private fun FolderDialog(
             val window = (dialogView.parent as? DialogWindowProvider)?.window
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && window != null) {
                 window.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
-                window.setBackgroundBlurRadius(22)
-                window.setDimAmount(0.12f)
+                window.setBackgroundBlurRadius(38)
+                window.setDimAmount(0.06f)
             }
         }
         Surface(
             modifier = Modifier.fillMaxWidth(0.88f).heightIn(max = 560.dp),
             shape = RoundedCornerShape(32.dp),
-            color = Color(0xA91B2638),
-            tonalElevation = 2.dp,
+            color = Color(0x551D2D43),
+            tonalElevation = 0.dp,
             shadowElevation = 30.dp
         ) {
             Column(
                 Modifier.fillMaxWidth().background(
                     androidx.compose.ui.graphics.Brush.verticalGradient(
-                        listOf(Color.White.copy(alpha = 0.13f), Color(0x66121C30))
+                        listOf(Color.White.copy(alpha = 0.30f), Color(0x222A4564))
                     )
                 ).padding(horizontal = 18.dp, vertical = 20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
+            ).border(
+                width = 1.dp,
+                brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                    listOf(Color.White.copy(alpha = 0.72f), Color.White.copy(alpha = 0.12f))
+                ),
+                shape = RoundedCornerShape(32.dp)
             ) {
                 if (editingName) {
                     OutlinedTextField(
