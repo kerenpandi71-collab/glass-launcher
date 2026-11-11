@@ -3,6 +3,7 @@ package com.kerenpandi.glasslauncher.ui.common
 import android.content.Context
 import android.content.Intent
 import android.content.pm.LauncherApps
+import android.app.ActivityManager
 import android.os.Process
 import android.net.Uri
 import android.provider.Settings
@@ -128,6 +129,13 @@ fun AppIcon(
                 )
             }
             DropdownMenuItem(
+                text = { Text("Hentikan aplikasi", color = Color.White) },
+                onClick = {
+                    menuOpen = false
+                    stopAppBackground(context, app)
+                }
+            )
+            DropdownMenuItem(
                 text = { Text("Info aplikasi", color = Color.White) },
                 onClick = {
                     menuOpen = false
@@ -142,6 +150,20 @@ fun AppIcon(
                 }
             )
         }
+    }
+}
+
+private fun stopAppBackground(context: Context, app: AppInfo) {
+    if (app.userHandle != Process.myUserHandle()) {
+        Toast.makeText(context, "Penghentian aplikasi profil lain tidak didukung", Toast.LENGTH_SHORT).show()
+        return
+    }
+    try {
+        val manager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+        manager.killBackgroundProcesses(app.packageName)
+        Toast.makeText(context, "Permintaan menghentikan proses latar dikirim", Toast.LENGTH_SHORT).show()
+    } catch (e: Exception) {
+        Toast.makeText(context, "Tidak dapat menghentikan proses aplikasi", Toast.LENGTH_SHORT).show()
     }
 }
 
