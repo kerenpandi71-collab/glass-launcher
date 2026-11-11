@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -38,12 +39,12 @@ fun SettingsSheet(
             )
     ) {
         Column(
-            Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+            Modifier.align(Alignment.TopCenter).fillMaxWidth()
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
                 ) { }
-                .padding(20.dp).navigationBarsPadding()
+                .padding(start = 20.dp, end = 20.dp, top = 76.dp).navigationBarsPadding()
         ) {
             GlassPanel(shape = RoundedCornerShape(30.dp)) {
                 Column(Modifier.fillMaxWidth().padding(20.dp)) {
