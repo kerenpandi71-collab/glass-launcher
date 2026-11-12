@@ -250,12 +250,19 @@ fun SettingsSheet(
                     }
                     viewModel.widgetIds.forEach { id ->
                         val info = manager.getAppWidgetInfo(id)
+                        val label = info?.provider?.let { cn ->
+                            runCatching {
+                                context.packageManager.getApplicationLabel(
+                                    context.packageManager.getApplicationInfo(cn.packageName, 0)
+                                ).toString()
+                            }.getOrNull()
+                        } ?: "Widget #$id"
                         Row(
                             Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                info?.providerInfo?.loadLabel(context.packageManager) ?: "Widget #$id",
+                                label,
                                 color = Color.White,
                                 fontSize = 14.sp,
                                 modifier = Modifier.weight(1f)
