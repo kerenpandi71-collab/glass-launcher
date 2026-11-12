@@ -1,6 +1,6 @@
 package com.kerenpandi.glasslauncher.ui.home
 
-// Build verification for the current feature-branch launcher changes.
+// Feature-branch build verification.
 
 import android.os.Build
 import android.widget.Toast
