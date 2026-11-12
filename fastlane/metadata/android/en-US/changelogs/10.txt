@@ -1,0 +1,1 @@
+Widget kini ditempatkan per layar utama, jumlah layar bisa diatur 2-6, scroll di dalam widget tidak lagi membuka panel pencarian, dan tombol back kembali ke layar pertama.

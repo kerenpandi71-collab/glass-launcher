@@ -155,9 +155,9 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         settings.toggleHiddenApp(key)
     }
 
-    fun addWidget(id: Int) {
+    fun addWidget(id: Int, page: Int = 0) {
         if (widgets.any { it.id == id }) return
-        widgets = widgets + WidgetEntry(id, WidgetStore.DEFAULT_WIDTH, WidgetStore.DEFAULT_HEIGHT)
+        widgets = widgets + WidgetEntry(id, WidgetStore.DEFAULT_WIDTH, WidgetStore.DEFAULT_HEIGHT, page)
         widgetStore.save(widgets)
     }
 

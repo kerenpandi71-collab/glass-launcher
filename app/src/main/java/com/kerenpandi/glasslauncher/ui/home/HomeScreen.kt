@@ -39,6 +39,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.runtime.*
+import kotlinx.coroutines.launch
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -96,40 +97,42 @@ fun HomeScreen(
     }
     val perPage = viewModel.appsPerPage
     val pages = remember(entries, perPage) { entries.chunked(perPage) }
-    val pageCount = pages.size.coerceAtLeast(1)
+    val pageCount = maxOf(pages.size, settings.homeScreens)
     val dockKeys = remember(dockApps) { dockApps.map { it.stableKey() }.toSet() }
     val dockFull = dockApps.size >= LauncherViewModel.DOCK_CAPACITY
 
+    val pagerState = rememberPagerState(pageCount = { pageCount })
+    val scope = rememberCoroutineScope()
     BackHandler(enabled = settingsOpen) { settingsOpen = false }
     BackHandler(enabled = searchOpen) { searchOpen = false }
+    BackHandler(enabled = !settingsOpen && !searchOpen && pagerState.currentPage > 0) {
+        scope.launch { pagerState.animateScrollToPage(0) }
+    }
 
-    Box(
-        Modifier.fillMaxSize().homeGestures(
-            onSwipeUp = {
-                if (!searchOpen && !settingsOpen) searchOpen = true
-            },
-            onSwipeDown = {
-                if (!searchOpen && !settingsOpen) {
-                    SystemActions.expandNotificationsPanel(context)
+    val onSwipeUp: () -> Unit = { if (!searchOpen && !settingsOpen) searchOpen = true }
+    val onSwipeDown: () -> Unit = {
+        if (!searchOpen && !settingsOpen) {
+            SystemActions.expandNotificationsPanel(context)
+        }
+    }
+    val onDoubleTap: () -> Unit = {
+        if (!searchOpen && !settingsOpen) {
+            if (SystemActions.isAdminActive(context)) {
+                if (!SystemActions.lockScreen(context)) {
+                    Toast.makeText(context, "Gagal mengunci layar", Toast.LENGTH_SHORT).show()
                 }
-            },
-            onDoubleTap = {
-                if (!searchOpen && !settingsOpen) {
-                    if (SystemActions.isAdminActive(context)) {
-                        if (!SystemActions.lockScreen(context)) {
-                            Toast.makeText(context, "Gagal mengunci layar", Toast.LENGTH_SHORT).show()
-                        }
-                    } else {
-                        lockPromptOpen = true
-                    }
-                }
+            } else {
+                lockPromptOpen = true
             }
-        )
-    ) {
+        }
+    }
+
+    Box(Modifier.fillMaxSize()) {
         GlassScrim(darken = if (settings.themeMode == com.kerenpandi.glasslauncher.data.ThemeModes.LIGHT) 0.10f else 0.22f)
         Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
             Row(
-                Modifier.fillMaxWidth().padding(top = 36.dp),
+                Modifier.fillMaxWidth().padding(top = 36.dp)
+                    .homeGestures(onSwipeUp, onSwipeDown, onDoubleTap),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -146,37 +149,44 @@ fun HomeScreen(
                 )
             }
 
-            WidgetArea(
-                widgets = viewModel.widgets,
-                onRemove = { viewModel.removeWidget(it) },
-                onResize = { id, w, h -> viewModel.resizeWidget(id, w, h) },
-                onResizeEnd = { viewModel.saveWidgets() }
-            )
-
-            val pagerState = rememberPagerState(pageCount = { pageCount })
             HorizontalPager(
                 state = pagerState,
                 beyondViewportPageCount = 1,
                 modifier = Modifier.weight(1f).padding(vertical = 12.dp)
             ) { page ->
-                if (entries.isNotEmpty()) AppGridPage(
-                    entries = pages[page],
-                    allApps = apps,
-                    pageCount = pageCount,
-                    dockKeys = dockKeys,
-                    dockFull = dockFull,
-                    folders = folders,
-                    columns = settings.gridColumns,
-                    onMovePage = { key, direction -> viewModel.movePage(key, direction) },
-                    onAddToDock = { viewModel.addToDock(it) },
-                    onAppClick = { viewModel.launch(it) },
-                    onHideApp = { viewModel.toggleHiddenApp(it) },
-                    onOpenFolder = { selectedFolder = it },
-                    onCreateFolder = { createFolderApp = it },
-                    onMoveToFolder = { folderPickerApp = it },
-                    onRenameFolder = { folder, name -> viewModel.renameFolder(folder.id, name) },
-                    onDeleteFolder = { viewModel.deleteFolder(it.id) }
-                )
+                Column(Modifier.fillMaxSize()) {
+                    WidgetArea(
+                        widgets = viewModel.widgets.filter { it.page == page },
+                        onRemove = { viewModel.removeWidget(it) },
+                        onResize = { id, w, h -> viewModel.resizeWidget(id, w, h) },
+                        onResizeEnd = { viewModel.saveWidgets() }
+                    )
+                    val pageEntries = pages.getOrElse(page) { emptyList() }
+                    Box(
+                        Modifier.fillMaxWidth().weight(1f)
+                            .homeGestures(onSwipeUp, onSwipeDown, onDoubleTap)
+                    ) {
+                        if (pageEntries.isEmpty()) EmptyHomeHint()
+                        else AppGridPage(
+                            entries = pageEntries,
+                            allApps = apps,
+                            pageCount = pageCount,
+                            dockKeys = dockKeys,
+                            dockFull = dockFull,
+                            folders = folders,
+                            columns = settings.gridColumns,
+                            onMovePage = { key, direction -> viewModel.movePage(key, direction) },
+                            onAddToDock = { viewModel.addToDock(it) },
+                            onAppClick = { viewModel.launch(it) },
+                            onHideApp = { viewModel.toggleHiddenApp(it) },
+                            onOpenFolder = { selectedFolder = it },
+                            onCreateFolder = { createFolderApp = it },
+                            onMoveToFolder = { folderPickerApp = it },
+                            onRenameFolder = { folder, name -> viewModel.renameFolder(folder.id, name) },
+                            onDeleteFolder = { viewModel.deleteFolder(it.id) }
+                        )
+                    }
+                }
             }
 
             Row(
@@ -193,6 +203,7 @@ fun HomeScreen(
                 onAppClick = { viewModel.launch(it) },
                 onRemoveFromDock = { viewModel.removeFromDock(it) },
                 modifier = Modifier.padding(bottom = 20.dp)
+                    .homeGestures(onSwipeUp, onSwipeDown, onDoubleTap)
             )
         }
 
@@ -204,6 +215,7 @@ fun HomeScreen(
         ) {
             SettingsSheet(
                 viewModel = viewModel,
+                homeScreenPage = pagerState.currentPage,
                 onSetWallpaper = onSetWallpaper,
                 onDismiss = { settingsOpen = false }
             )
@@ -293,6 +305,19 @@ fun Dock(
                     extraMenuItems = listOf(AppMenuItem("Lepas dari dock") { onRemoveFromDock(app.stableKey()) }))
             }
         }
+    }
+}
+
+@Composable
+private fun EmptyHomeHint() {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Text(
+            "Layar kosong\nGeser ke atas untuk pencarian · Tahan ikon untuk opsi",
+            color = Color.White.copy(alpha = 0.5f),
+            fontSize = 13.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 32.dp)
+        )
     }
 }
 

@@ -35,6 +35,8 @@ class LauncherSettings(context: Context) {
         private set
     var gridColumns by mutableStateOf(prefs.getInt(KEY_GRID_COLUMNS, 4))
         private set
+    var homeScreens by mutableStateOf(prefs.getInt(KEY_HOME_SCREENS, 4))
+        private set
     var iconSizeDp by mutableStateOf(prefs.getInt(KEY_ICON_SIZE, 52))
         private set
     var showLabels by mutableStateOf(prefs.getBoolean(KEY_SHOW_LABELS, true))
@@ -65,6 +67,11 @@ class LauncherSettings(context: Context) {
     fun updateGridColumns(value: Int) {
         gridColumns = value
         prefs.edit().putInt(KEY_GRID_COLUMNS, value).apply()
+    }
+
+    fun updateHomeScreens(value: Int) {
+        homeScreens = value
+        prefs.edit().putInt(KEY_HOME_SCREENS, value).apply()
     }
 
     fun updateIconSizeDp(value: Int) {
@@ -138,6 +145,7 @@ class LauncherSettings(context: Context) {
         themeMode = prefs.getString(KEY_THEME, ThemeModes.DARK) ?: ThemeModes.DARK
         dynamicColor = prefs.getBoolean(KEY_DYNAMIC_COLOR, false)
         gridColumns = prefs.getInt(KEY_GRID_COLUMNS, 4)
+        homeScreens = prefs.getInt(KEY_HOME_SCREENS, 4)
         iconSizeDp = prefs.getInt(KEY_ICON_SIZE, 52)
         showLabels = prefs.getBoolean(KEY_SHOW_LABELS, true)
         iconShape = prefs.getString(KEY_ICON_SHAPE, IconShapes.CIRCLE) ?: IconShapes.CIRCLE
@@ -153,6 +161,7 @@ class LauncherSettings(context: Context) {
         const val KEY_THEME = "theme_mode"
         const val KEY_DYNAMIC_COLOR = "dynamic_color"
         const val KEY_GRID_COLUMNS = "grid_columns"
+        const val KEY_HOME_SCREENS = "home_screens"
         const val KEY_ICON_SIZE = "icon_size_dp"
         const val KEY_SHOW_LABELS = "show_labels"
         const val KEY_ICON_SHAPE = "icon_shape"

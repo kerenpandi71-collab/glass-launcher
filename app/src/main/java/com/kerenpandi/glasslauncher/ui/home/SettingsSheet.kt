@@ -69,6 +69,7 @@ import com.kerenpandi.glasslauncher.ui.widgets.WidgetPickerDialog
 @Composable
 fun SettingsSheet(
     viewModel: LauncherViewModel,
+    homeScreenPage: Int,
     onSetWallpaper: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -85,7 +86,7 @@ fun SettingsSheet(
     val configureLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val id = pendingWidgetId
         if (result.resultCode == Activity.RESULT_OK && id > 0) {
-            viewModel.addWidget(id)
+            viewModel.addWidget(id, homeScreenPage)
             Toast.makeText(context, "Widget ditambahkan", Toast.LENGTH_SHORT).show()
         } else if (id > 0) {
             runCatching { host.deleteAppWidgetId(id) }
@@ -103,7 +104,7 @@ fun SettingsSheet(
                         .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id)
                 )
             } else {
-                viewModel.addWidget(id)
+                viewModel.addWidget(id, homeScreenPage)
                 Toast.makeText(context, "Widget ditambahkan", Toast.LENGTH_SHORT).show()
                 pendingWidgetId = -1
             }
@@ -211,6 +212,17 @@ fun SettingsSheet(
                         selected = settings.gridColumns,
                         onSelect = { settings.updateGridColumns(it) }
                     )
+                    Text(
+                        "Jumlah layar utama",
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
+                    )
+                    ChipRow(
+                        options = listOf(2 to "2", 3 to "3", 4 to "4", 5 to "5", 6 to "6"),
+                        selected = settings.homeScreens,
+                        onSelect = { settings.updateHomeScreens(it) }
+                    )
                     Column(Modifier.padding(horizontal = 6.dp, vertical = 8.dp)) {
                         Text("Ukuran ikon: ${settings.iconSizeDp} dp", color = Color.White, fontSize = 14.sp)
                         Slider(
@@ -273,7 +285,7 @@ fun SettingsSheet(
                     SectionTitle("Widget")
                     SettingRow("Tambah widget") { pickerOpen = true }
                     Text(
-                        "Tarik titik di pojok kanan bawah widget untuk mengubah ukuran.",
+                        "Widget ditambahkan ke layar utama yang sedang terbuka. Tarik titik di pojok kanan bawah widget untuk mengubah ukuran.",
                         color = Color.White.copy(alpha = 0.6f),
                         fontSize = 12.sp,
                         modifier = Modifier.padding(horizontal = 6.dp)
@@ -292,7 +304,7 @@ fun SettingsSheet(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                "$label · ${entry.widthDp}×${entry.heightDp} dp",
+                                "$label · Layar ${(entry.page + 1).coerceAtMost(settings.homeScreens)} · ${entry.widthDp}×${entry.heightDp} dp",
                                 color = Color.White,
                                 fontSize = 14.sp,
                                 modifier = Modifier.weight(1f)
@@ -392,7 +404,7 @@ fun SettingsSheet(
                                 .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id)
                         )
                     } else {
-                        viewModel.addWidget(id)
+                        viewModel.addWidget(id, homeScreenPage)
                         pendingWidgetId = -1
                         Toast.makeText(context, "Widget ditambahkan", Toast.LENGTH_SHORT).show()
                     }
