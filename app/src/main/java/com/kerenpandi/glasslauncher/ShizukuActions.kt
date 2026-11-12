@@ -75,13 +75,22 @@ object ShizukuActions {
     private fun forceStop(context: Context, packageName: String) {
         executor.execute {
             val exitCode = runCatching {
-                val process = Shizuku.newProcess(
+                val method = Shizuku::class.java
+                    .getDeclaredMethod(
+                        "newProcess",
+                        Array<String>::class.java,
+                        Array<String>::class.java,
+                        String::class.java
+                    )
+                    .apply { isAccessible = true }
+                val remote = method.invoke(
+                    null,
                     arrayOf("am", "force-stop", "--user", "0", packageName),
                     null,
                     null
                 )
-                val code = process.waitFor()
-                runCatching { process.destroy() }
+                val code = remote.javaClass.getMethod("waitFor").invoke(remote) as Int
+                runCatching { remote.javaClass.getMethod("destroy").invoke(remote) }
                 code
             }.getOrElse { -1 }
             mainHandler.post {

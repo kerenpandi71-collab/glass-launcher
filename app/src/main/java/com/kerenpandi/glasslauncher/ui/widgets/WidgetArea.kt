@@ -1,5 +1,6 @@
 package com.kerenpandi.glasslauncher.ui.widgets
 
+import android.appwidget.AppWidgetHostView
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProviderInfo
 import android.os.Bundle
@@ -68,16 +69,20 @@ fun WidgetArea(
                 ) {
                     AndroidView(
                         factory = { ctx ->
-                            runCatching {
+                            try {
                                 host.createView(ctx, entry.id, info)
-                            }.getOrDefault(FrameLayout(ctx))
+                            } catch (e: Exception) {
+                                FrameLayout(ctx)
+                            }
                         },
                         update = { view ->
-                            runCatching {
-                                view.updateAppWidgetSize(
-                                    Bundle(),
-                                    widthDp, heightDp, widthDp, heightDp
-                                )
+                            (view as? AppWidgetHostView)?.let { hostView ->
+                                runCatching {
+                                    hostView.updateAppWidgetSize(
+                                        Bundle(),
+                                        widthDp, heightDp, widthDp, heightDp
+                                    )
+                                }
                             }
                         },
                         modifier = Modifier.width(widthDp.dp).fillMaxHeight()
