@@ -55,7 +55,6 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.app.NotificationManagerCompat
-import androidx.core.content.ContextCompat
 import com.kerenpandi.glasslauncher.BuildConfig
 import com.kerenpandi.glasslauncher.LauncherViewModel
 import com.kerenpandi.glasslauncher.ShizukuActions
@@ -83,15 +82,35 @@ fun SettingsSheet(
     val manager = remember { AppWidgetManager.getInstance(context) }
     var pendingWidgetId by remember { mutableStateOf(-1) }
 
-    val bindLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+    val configureLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val id = pendingWidgetId
         if (result.resultCode == Activity.RESULT_OK && id > 0) {
             viewModel.addWidget(id)
             Toast.makeText(context, "Widget ditambahkan", Toast.LENGTH_SHORT).show()
         } else if (id > 0) {
-            host.deleteAppWidgetId(id)
+            runCatching { host.deleteAppWidgetId(id) }
         }
         pendingWidgetId = -1
+    }
+    val bindLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val id = pendingWidgetId
+        if (result.resultCode == Activity.RESULT_OK && id > 0) {
+            val configure = manager.getAppWidgetInfo(id)?.configure
+            if (configure != null) {
+                configureLauncher.launch(
+                    Intent(AppWidgetManager.ACTION_APPWIDGET_CONFIGURE)
+                        .setComponent(configure)
+                        .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id)
+                )
+            } else {
+                viewModel.addWidget(id)
+                Toast.makeText(context, "Widget ditambahkan", Toast.LENGTH_SHORT).show()
+                pendingWidgetId = -1
+            }
+        } else {
+            if (id > 0) runCatching { host.deleteAppWidgetId(id) }
+            pendingWidgetId = -1
+        }
     }
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         uri?.let(viewModel::exportLayout)
@@ -362,9 +381,18 @@ fun SettingsSheet(
                 pendingWidgetId = id
                 val bound = manager.bindAppWidgetIdIfAllowed(id, info.provider)
                 if (bound) {
-                    viewModel.addWidget(id)
-                    pendingWidgetId = -1
-                    Toast.makeText(context, "Widget ditambahkan", Toast.LENGTH_SHORT).show()
+                    val configure = manager.getAppWidgetInfo(id)?.configure
+                    if (configure != null) {
+                        configureLauncher.launch(
+                            Intent(AppWidgetManager.ACTION_APPWIDGET_CONFIGURE)
+                                .setComponent(configure)
+                                .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id)
+                        )
+                    } else {
+                        viewModel.addWidget(id)
+                        pendingWidgetId = -1
+                        Toast.makeText(context, "Widget ditambahkan", Toast.LENGTH_SHORT).show()
+                    }
                 } else {
                     bindLauncher.launch(
                         Intent(AppWidgetManager.ACTION_APPWIDGET_BIND)
