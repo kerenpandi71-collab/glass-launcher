@@ -1,9 +1,11 @@
 package com.kerenpandi.glasslauncher
 
 import android.app.Application
+import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
@@ -12,8 +14,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.kerenpandi.glasslauncher.data.AppInfo
 import com.kerenpandi.glasslauncher.data.AppRepository
+import com.kerenpandi.glasslauncher.data.BackupManager
+import com.kerenpandi.glasslauncher.data.BadgeNotificationListener
 import com.kerenpandi.glasslauncher.data.LauncherFolder
+import com.kerenpandi.glasslauncher.data.LauncherSettings
 import com.kerenpandi.glasslauncher.data.OrderStore
+import com.kerenpandi.glasslauncher.data.WidgetStore
 import com.kerenpandi.glasslauncher.data.stableKey
 import java.util.UUID
 
@@ -21,25 +27,55 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     private val repository = AppRepository(app)
     private val orderStore = OrderStore(app)
-    private var refreshJob: Job? = null
+    private val widgetStore = WidgetStore(app)
+    val settings = LauncherSettings(app)
 
+    private var refreshJob: Job? = null
+    private var loadedApps by mutableStateOf<List<AppInfo>>(emptyList())
+
+    var allApps by mutableStateOf<List<AppInfo>>(emptyList())
+        private set
     var apps by mutableStateOf<List<AppInfo>>(emptyList())
         private set
     var dockApps by mutableStateOf<List<AppInfo>>(emptyList())
         private set
     var folders by mutableStateOf<List<LauncherFolder>>(emptyList())
         private set
+    var widgetIds by mutableStateOf<List<Int>>(emptyList())
+        private set
+    var badges by mutableStateOf<Map<String, Int>>(emptyMap())
+        private set
 
-    init { refresh() }
+    val appsPerPage: Int get() = settings.gridColumns * GRID_ROWS
+
+    init {
+        refresh()
+        viewModelScope.launch {
+            snapshotFlow { settings.hiddenApps }.collect { reapplyFilters() }
+        }
+        viewModelScope.launch {
+            BadgeNotificationListener.counts.collect { badges = it }
+        }
+    }
 
     fun refresh() {
         refreshJob?.cancel()
         refreshJob = viewModelScope.launch {
             val loaded = withContext(Dispatchers.IO) { repository.loadApps() }
-            apps = orderStore.applyOrder(loaded)
-            dockApps = if (orderStore.hasDockOrder()) orderStore.applyDockOrder(loaded)
-                else apps.take(DOCK_CAPACITY)
+            loadedApps = orderStore.applyOrder(loaded)
+            reapplyFilters()
             folders = orderStore.loadFolders(loaded)
+            widgetIds = widgetStore.prune(getApplication())
+        }
+    }
+
+    private fun reapplyFilters() {
+        allApps = loadedApps
+        apps = loadedApps.filterNot { it.stableKey() in settings.hiddenApps }
+        dockApps = if (orderStore.hasDockOrder()) {
+            orderStore.applyDockOrder(loadedApps).filterNot { it.stableKey() in settings.hiddenApps }
+        } else {
+            apps.take(DOCK_CAPACITY)
         }
     }
 
@@ -47,14 +83,15 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         val list = apps.toMutableList()
         val index = list.indexOfFirst { it.stableKey() == key }
         if (index < 0) return
-        val page = index / APPS_PER_PAGE
+        val perPage = appsPerPage
+        val page = index / perPage
         val targetPage = page + direction
         if (targetPage < 0) return
         val item = list.removeAt(index)
         val newIndex = if (direction > 0) {
-            ((targetPage + 1) * APPS_PER_PAGE - 1).coerceAtMost(list.size - 1)
+            ((targetPage + 1) * perPage - 1).coerceAtMost(list.size - 1)
         } else {
-            (targetPage * APPS_PER_PAGE).coerceAtMost(list.size - 1)
+            (targetPage * perPage).coerceAtMost(list.size - 1)
         }
         list.add(newIndex.coerceAtLeast(0), item)
         apps = list
@@ -113,10 +150,55 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         orderStore.saveFolders(next)
     }
 
+    fun toggleHiddenApp(key: String) {
+        settings.toggleHiddenApp(key)
+    }
+
+    fun addWidget(id: Int) {
+        if (id in widgetIds) return
+        widgetIds = widgetIds + id
+        widgetStore.save(widgetIds)
+    }
+
+    fun removeWidget(id: Int) {
+        widgetIds = widgetIds - id
+        widgetStore.save(widgetIds)
+    }
+
+    fun exportLayout(uri: Uri) {
+        val context = getApplication<Application>()
+        viewModelScope.launch(Dispatchers.IO) {
+            val json = BackupManager.export(context)
+            runCatching {
+                context.contentResolver.openOutputStream(uri)?.use { stream ->
+                    stream.write(json.toByteArray(Charsets.UTF_8))
+                }
+            }
+        }
+    }
+
+    fun importLayout(uri: Uri) {
+        val context = getApplication<Application>()
+        viewModelScope.launch(Dispatchers.IO) {
+            val text = runCatching {
+                context.contentResolver.openInputStream(uri)?.use { stream ->
+                    stream.readBytes().toString(Charsets.UTF_8)
+                }
+            }.getOrNull() ?: return@launch
+            BackupManager.import(context, text)
+            withContext(Dispatchers.Main) { reloadAfterRestore() }
+        }
+    }
+
+    fun reloadAfterRestore() {
+        settings.reload()
+        refresh()
+    }
+
     fun launch(app: AppInfo) { repository.launch(getApplication(), app) }
 
     companion object {
-        const val APPS_PER_PAGE = 24
+        const val GRID_ROWS = 6
         const val DOCK_CAPACITY = 4
     }
 }

@@ -6,6 +6,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.runtime.CompositionLocalProvider
+import com.kerenpandi.glasslauncher.ui.common.LocalBadges
+import com.kerenpandi.glasslauncher.ui.common.LocalLauncherSettings
 import com.kerenpandi.glasslauncher.ui.home.HomeScreen
 import com.kerenpandi.glasslauncher.ui.theme.GlassTheme
 
@@ -16,11 +19,19 @@ class LauncherActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            GlassTheme {
-                HomeScreen(
-                    viewModel = viewModel,
-                    onSetWallpaper = { openWallpaperPicker() }
-                )
+            CompositionLocalProvider(
+                LocalLauncherSettings provides viewModel.settings,
+                LocalBadges provides viewModel.badges
+            ) {
+                GlassTheme(
+                    themeMode = viewModel.settings.themeMode,
+                    dynamicColor = viewModel.settings.dynamicColor
+                ) {
+                    HomeScreen(
+                        viewModel = viewModel,
+                        onSetWallpaper = { openWallpaperPicker() }
+                    )
+                }
             }
         }
     }

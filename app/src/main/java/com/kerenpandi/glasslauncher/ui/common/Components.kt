@@ -11,6 +11,8 @@ import android.widget.Toast
 import android.util.LruCache
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -20,9 +22,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -35,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -48,6 +53,8 @@ import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
 import com.kerenpandi.glasslauncher.ShizukuActions
 import com.kerenpandi.glasslauncher.data.AppInfo
+import com.kerenpandi.glasslauncher.data.IconPackStore
+import com.kerenpandi.glasslauncher.data.IconShapes
 import com.kerenpandi.glasslauncher.data.stableKey
 import com.kerenpandi.glasslauncher.ui.glass.glassSurface
 import kotlinx.coroutines.delay
@@ -74,15 +81,35 @@ fun cachedAppIcon(app: AppInfo, sizePx: Int): ImageBitmap {
 @Composable
 fun AppIcon(
     app: AppInfo,
-    iconSize: Dp = 52.dp,
-    showLabel: Boolean = true,
+    iconSize: Dp? = null,
+    showLabel: Boolean? = null,
     onClick: () -> Unit,
     extraMenuItems: List<AppMenuItem> = emptyList(),
     modifier: Modifier = Modifier
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     val context = LocalContext.current
-    val bitmap = remember(app.stableKey()) { cachedAppIcon(app, 96) }
+    val settings = LocalLauncherSettings.current
+    val effectiveSize = iconSize ?: (settings?.iconSizeDp ?: 52).dp
+    val effectiveLabel = showLabel ?: settings?.showLabels ?: true
+    val badgeCount = if (settings?.notificationBadges != false) {
+        LocalBadges.current[app.packageName] ?: 0
+    } else 0
+    val iconPack = settings?.iconPackPackage.orEmpty()
+    val bitmap = remember(app.stableKey(), iconPack) {
+        val packed = if (iconPack.isNotBlank()) {
+            runCatching {
+                IconPackStore.iconFor(context, iconPack, app)?.toBitmap(96, 96)?.asImageBitmap()
+            }.getOrNull()
+        } else null
+        packed ?: cachedAppIcon(app, 96)
+    }
+    val iconShape = when (settings?.iconShape) {
+        IconShapes.ROUNDED -> RoundedCornerShape(30)
+        IconShapes.SQUIRCLE -> RoundedCornerShape(22)
+        IconShapes.SQUARE -> RectangleShape
+        else -> CircleShape
+    }
     Box(modifier = modifier) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -95,13 +122,32 @@ fun AppIcon(
                 )
                 .padding(8.dp)
         ) {
-            Image(
-                bitmap = bitmap,
-                contentDescription = app.label,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.size(iconSize)
-            )
-            if (showLabel) {
+            Box(contentAlignment = Alignment.Center) {
+                Image(
+                    bitmap = bitmap,
+                    contentDescription = app.label,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.size(effectiveSize).clip(iconShape)
+                )
+                if (badgeCount > 0) {
+                    Box(
+                        Modifier
+                            .align(Alignment.TopEnd)
+                            .size(18.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFE53935))
+                            .border(1.dp, Color.White, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = badgeCount.coerceAtMost(9).toString(),
+                            color = Color.White,
+                            fontSize = 10.sp
+                        )
+                    }
+                }
+            }
+            if (effectiveLabel) {
                 Text(
                     text = app.label,
                     color = Color.White,
@@ -118,11 +164,11 @@ fun AppIcon(
         DropdownMenu(
             expanded = menuOpen,
             onDismissRequest = { menuOpen = false },
-            containerColor = Color(0xFF141C2E)
+            containerColor = MaterialTheme.colorScheme.surface
         ) {
             extraMenuItems.forEach { item ->
                 DropdownMenuItem(
-                    text = { Text(item.label, color = Color.White) },
+                    text = { Text(item.label, color = MaterialTheme.colorScheme.onSurface) },
                     onClick = {
                         menuOpen = false
                         item.action()
@@ -130,21 +176,21 @@ fun AppIcon(
                 )
             }
             DropdownMenuItem(
-                text = { Text("Hentikan aplikasi", color = Color.White) },
+                text = { Text("Hentikan aplikasi", color = MaterialTheme.colorScheme.onSurface) },
                 onClick = {
                     menuOpen = false
                     ShizukuActions.stopApp(context, app.packageName)
                 }
             )
             DropdownMenuItem(
-                text = { Text("Info aplikasi", color = Color.White) },
+                text = { Text("Info aplikasi", color = MaterialTheme.colorScheme.onSurface) },
                 onClick = {
                     menuOpen = false
                     openAppInfo(context, app)
                 }
             )
             DropdownMenuItem(
-                text = { Text("Uninstall", color = Color.White) },
+                text = { Text("Uninstall", color = MaterialTheme.colorScheme.onSurface) },
                 onClick = {
                     menuOpen = false
                     uninstallApp(context, app)

@@ -11,6 +11,16 @@ Launcher Android bertema liquid glass ala iOS, dibangun dengan Kotlin + Jetpack 
 - Folder bergaya iPhone: panel tengah, grid ikon 3 kolom, edit nama, tambah dan keluarkan aplikasi.
 - Aplikasi clone / Dual Apps melalui LauncherApps dan profil pengguna.
 - Info aplikasi dan uninstall melalui dialog sistem Android.
+- Pencarian aplikasi (overlay pencarian dan kolom cari di drawer).
+- Badge jumlah notifikasi per aplikasi melalui NotificationListenerService.
+- Gestur: geser atas membuka drawer, geser bawah membuka panel notifikasi, double-tap mengunci layar (via device admin).
+- Widget Android di home screen melalui AppWidgetHost.
+- App drawer dengan kolom pencarian.
+- Sembunyikan aplikasi dari home, drawer, dan pencarian.
+- Kustomisasi: jumlah kolom grid, ukuran ikon, bentuk ikon, label, dan icon pack format ADW.
+- Backup dan restore layout serta pengaturan (JSON via Storage Access Framework).
+- At a Glance: cuaca (Open-Meteo) dan agenda kalender berikutnya.
+- Tema gelap, terang, sistem, dan warna dinamis Material You.
 
 ## Performa
 
@@ -19,7 +29,7 @@ Launcher Android bertema liquid glass ala iOS, dibangun dengan Kotlin + Jetpack 
 - Ikon aplikasi di-cache.
 - Halaman pager tetangga di-pre-compose.
 - Data halaman di-memoize agar daftar tidak di-chunk ulang pada setiap recomposition.
-- Grid halaman dibatasi 24 item per halaman.
+- Grid halaman dibatasi enam baris per halaman.
 
 ## Build
 
