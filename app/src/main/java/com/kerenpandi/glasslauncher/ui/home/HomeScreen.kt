@@ -159,32 +159,38 @@ fun HomeScreen(
                         widgets = viewModel.widgets.filter { it.page == page },
                         onRemove = { viewModel.removeWidget(it) },
                         onResize = { id, w, h -> viewModel.resizeWidget(id, w, h) },
-                        onResizeEnd = { viewModel.saveWidgets() }
+                        onResizeEnd = { viewModel.saveWidgets() },
+                        onMoveCommit = { id, offsetX, targetIndex ->
+                            viewModel.setWidgetOffset(id, offsetX)
+                            viewModel.moveWidgetToIndex(id, targetIndex)
+                            viewModel.saveWidgets()
+                        }
                     )
                     val pageEntries = pages.getOrElse(page) { emptyList() }
                     Box(
                         Modifier.fillMaxWidth().weight(1f)
                             .homeGestures(onSwipeUp, onSwipeDown, onDoubleTap)
                     ) {
-                        if (pageEntries.isEmpty()) EmptyHomeHint()
-                        else AppGridPage(
-                            entries = pageEntries,
-                            allApps = apps,
-                            pageCount = pageCount,
-                            dockKeys = dockKeys,
-                            dockFull = dockFull,
-                            folders = folders,
-                            columns = settings.gridColumns,
-                            onMovePage = { key, direction -> viewModel.movePage(key, direction) },
-                            onAddToDock = { viewModel.addToDock(it) },
-                            onAppClick = { viewModel.launch(it) },
-                            onHideApp = { viewModel.toggleHiddenApp(it) },
-                            onOpenFolder = { selectedFolder = it },
-                            onCreateFolder = { createFolderApp = it },
-                            onMoveToFolder = { folderPickerApp = it },
-                            onRenameFolder = { folder, name -> viewModel.renameFolder(folder.id, name) },
-                            onDeleteFolder = { viewModel.deleteFolder(it.id) }
-                        )
+                        if (pageEntries.isNotEmpty()) {
+                            AppGridPage(
+                                entries = pageEntries,
+                                allApps = apps,
+                                pageCount = pageCount,
+                                dockKeys = dockKeys,
+                                dockFull = dockFull,
+                                folders = folders,
+                                columns = settings.gridColumns,
+                                onMovePage = { key, direction -> viewModel.movePage(key, direction) },
+                                onAddToDock = { viewModel.addToDock(it) },
+                                onAppClick = { viewModel.launch(it) },
+                                onHideApp = { viewModel.toggleHiddenApp(it) },
+                                onOpenFolder = { selectedFolder = it },
+                                onCreateFolder = { createFolderApp = it },
+                                onMoveToFolder = { folderPickerApp = it },
+                                onRenameFolder = { folder, name -> viewModel.renameFolder(folder.id, name) },
+                                onDeleteFolder = { viewModel.deleteFolder(it.id) }
+                            )
+                        }
                     }
                 }
             }
@@ -305,19 +311,6 @@ fun Dock(
                     extraMenuItems = listOf(AppMenuItem("Lepas dari dock") { onRemoveFromDock(app.stableKey()) }))
             }
         }
-    }
-}
-
-@Composable
-private fun EmptyHomeHint() {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text(
-            "Layar kosong\nGeser ke atas untuk pencarian · Tahan ikon untuk opsi",
-            color = Color.White.copy(alpha = 0.5f),
-            fontSize = 13.sp,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(horizontal = 32.dp)
-        )
     }
 }
 

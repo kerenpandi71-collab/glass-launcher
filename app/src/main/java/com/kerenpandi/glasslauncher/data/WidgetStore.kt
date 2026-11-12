@@ -22,7 +22,8 @@ data class WidgetEntry(
     val id: Int,
     val widthDp: Int,
     val heightDp: Int,
-    val page: Int = 0
+    val page: Int = 0,
+    val offsetXDp: Int = 0
 )
 
 class WidgetStore(context: Context) {
@@ -43,7 +44,8 @@ class WidgetStore(context: Context) {
                                 id = id,
                                 widthDp = item.optInt("widthDp", DEFAULT_WIDTH),
                                 heightDp = item.optInt("heightDp", DEFAULT_HEIGHT),
-                                page = item.optInt("page", 0)
+                                page = item.optInt("page", 0),
+                                offsetXDp = item.optInt("offsetXDp", 0)
                             )
                         )
                     }
@@ -61,6 +63,7 @@ class WidgetStore(context: Context) {
                     .put("widthDp", entry.widthDp)
                     .put("heightDp", entry.heightDp)
                     .put("page", entry.page)
+                    .put("offsetXDp", entry.offsetXDp)
             )
         }
         prefs.edit().putString(KEY_WIDGETS, array.toString()).apply()
