@@ -161,8 +161,7 @@ fun HomeScreen(
                 beyondViewportPageCount = 1,
                 modifier = Modifier.weight(1f).padding(vertical = 12.dp)
             ) { page ->
-                if (entries.isEmpty()) EmptyHomeHint()
-                else AppGridPage(
+                if (entries.isNotEmpty()) AppGridPage(
                     entries = pages[page],
                     allApps = apps,
                     pageCount = pageCount,
@@ -282,17 +281,6 @@ fun HomeScreen(
 }
 
 @Composable
-private fun EmptyHomeHint() {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        GlassPanel(shape = RoundedCornerShape(24.dp)) {
-            Text("Tidak ada aplikasi", color = Color.White.copy(alpha = 0.8f),
-                textAlign = TextAlign.Center, fontSize = 13.sp,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 18.dp))
-        }
-    }
-}
-
-@Composable
 fun Dock(
     apps: List<AppInfo>,
     onAppClick: (AppInfo) -> Unit,
@@ -302,11 +290,7 @@ fun Dock(
     GlassPanel(modifier = modifier.fillMaxWidth(), shape = RoundedCornerShape(30.dp)) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-            if (apps.isEmpty()) {
-                Text("Tahan ikon di atas lalu pilih \"Tambahkan ke dock\"",
-                    color = Color.White.copy(alpha = 0.6f), fontSize = 11.sp,
-                    textAlign = TextAlign.Center, modifier = Modifier.padding(vertical = 18.dp))
-            } else apps.forEach { app ->
+            apps.forEach { app ->
                 AppIcon(app = app, showLabel = false, onClick = { onAppClick(app) },
                     extraMenuItems = listOf(AppMenuItem("Lepas dari dock") { onRemoveFromDock(app.stableKey()) }))
             }
