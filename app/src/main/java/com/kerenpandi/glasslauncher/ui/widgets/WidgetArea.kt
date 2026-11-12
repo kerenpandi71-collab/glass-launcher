@@ -73,6 +73,7 @@ fun WidgetArea(
     }
 
     BoxWithConstraints(Modifier.fillMaxWidth().padding(top = 8.dp)) {
+        val availableWidth = maxWidth
         val centers = run {
             var acc = 0f
             widgets.map { entry ->
@@ -89,7 +90,7 @@ fun WidgetArea(
                     val minHeightDp = info.minHeight.coerceAtLeast(60)
                     val widthDp = entry.widthDp.coerceIn(minWidthDp, 480)
                     val heightDp = entry.heightDp.coerceIn(minHeightDp, 320)
-                    val maxOffsetXDp = ((maxWidth - widthDp.dp) / 2).coerceAtLeast(0.dp).value
+                    val maxOffsetXDp = ((availableWidth - widthDp.dp) / 2).coerceAtLeast(0.dp).value
                     val baseOffsetX = entry.offsetXDp.coerceIn(-maxOffsetXDp.toInt(), maxOffsetXDp.toInt())
                     val currentWidth by rememberUpdatedState(widthDp)
                     val currentHeight by rememberUpdatedState(heightDp)
