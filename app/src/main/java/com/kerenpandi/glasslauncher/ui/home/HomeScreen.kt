@@ -160,10 +160,8 @@ fun HomeScreen(
                         onRemove = { viewModel.removeWidget(it) },
                         onResize = { id, w, h -> viewModel.resizeWidget(id, w, h) },
                         onResizeEnd = { viewModel.saveWidgets() },
-                        onMoveCommit = { id, offsetX, targetIndex ->
-                            viewModel.setWidgetOffset(id, offsetX)
-                            viewModel.moveWidgetToIndex(id, targetIndex)
-                            viewModel.saveWidgets()
+                        onMoveCommit = { orderIds, movedIds, offsetX ->
+                            viewModel.applyPageWidgetOrder(orderIds, movedIds, offsetX)
                         }
                     )
                     val pageEntries = pages.getOrElse(page) { emptyList() }

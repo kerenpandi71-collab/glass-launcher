@@ -78,6 +78,7 @@ fun SettingsSheet(
     var hiddenDialogOpen by remember { mutableStateOf(false) }
     var resetConfirmOpen by remember { mutableStateOf(false) }
     var pickerOpen by remember { mutableStateOf(false) }
+    var stackDialogFor by remember { mutableStateOf<Int?>(null) }
 
     val host = remember { WidgetHosts.get(context) }
     val manager = remember { AppWidgetManager.getInstance(context) }
@@ -285,7 +286,7 @@ fun SettingsSheet(
                     SectionTitle("Widget")
                     SettingRow("Tambah widget") { pickerOpen = true }
                     Text(
-                        "Widget ditambahkan ke layar utama yang sedang terbuka. Tarik titik di pojok kanan bawah widget untuk mengubah ukuran.",
+                        "Widget ditambahkan ke layar utama yang sedang terbuka. Tahan lama widget untuk memindahkannya, tarik titik biru untuk mengubah ukuran. Tekan 'Stack' untuk menggabungkan beberapa widget menjadi satu tumpukan yang berganti otomatis.",
                         color = Color.White.copy(alpha = 0.6f),
                         fontSize = 12.sp,
                         modifier = Modifier.padding(horizontal = 6.dp)
@@ -309,6 +310,7 @@ fun SettingsSheet(
                                 fontSize = 14.sp,
                                 modifier = Modifier.weight(1f)
                             )
+                            TextButton(onClick = { stackDialogFor = entry.id }) { Text("Stack") }
                             TextButton(onClick = {
                                 runCatching { host.deleteAppWidgetId(entry.id) }
                                 viewModel.removeWidget(entry.id)
@@ -423,6 +425,46 @@ fun SettingsSheet(
                 }
             },
             onDismiss = { pickerOpen = false }
+        )
+    }
+
+    stackDialogFor?.let { widgetId ->
+        val currentStack = viewModel.widgets.firstOrNull { it.id == widgetId }?.stackId ?: 0
+        AlertDialog(
+            onDismissRequest = { stackDialogFor = null },
+            title = { Text("Tumpukan widget") },
+            text = {
+                Column {
+                    Text(
+                        if (currentStack > 0) "Widget ini ada di Stack $currentStack."
+                        else "Pilih tumpukan. Widget dalam stack yang sama tampil bergantian otomatis di satu slot.",
+                        fontSize = 14.sp
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        (1..3).forEach { n ->
+                            TextButton(onClick = {
+                                viewModel.setWidgetStack(widgetId, n)
+                                stackDialogFor = null
+                            }) {
+                                Text(
+                                    "Stack $n",
+                                    fontWeight = if (currentStack == n) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
+                        }
+                    }
+                    if (currentStack > 0) {
+                        TextButton(onClick = {
+                            viewModel.setWidgetStack(widgetId, 0)
+                            stackDialogFor = null
+                        }) { Text("Lepas dari stack") }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { stackDialogFor = null }) { Text("Tutup") }
+            }
         )
     }
 

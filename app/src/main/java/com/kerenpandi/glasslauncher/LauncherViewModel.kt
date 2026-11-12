@@ -172,22 +172,23 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun setWidgetOffset(id: Int, offsetXDp: Int) {
+    fun setWidgetStack(id: Int, stackId: Int) {
         widgets = widgets.map {
-            if (it.id == id) it.copy(offsetXDp = offsetXDp) else it
+            if (it.id == id) it.copy(stackId = stackId) else it
         }
+        widgetStore.save(widgets)
     }
 
-    fun moveWidgetToIndex(id: Int, targetIndex: Int) {
-        val entry = widgets.firstOrNull { it.id == id } ?: return
-        val pageWidgets = widgets.filter { it.page == entry.page }.toMutableList()
-        pageWidgets.removeAll { it.id == id }
-        val clamped = targetIndex.coerceIn(0, pageWidgets.size)
-        pageWidgets.add(clamped, entry)
-        val firstIdx = widgets.indexOfFirst { it.page == entry.page }
-        val next = widgets.filterNot { it.page == entry.page }.toMutableList()
-        next.addAll(firstIdx.coerceAtMost(next.size), pageWidgets)
-        widgets = next
+    fun applyPageWidgetOrder(newOrderIds: List<Int>, movedIds: List<Int>, offsetX: Int) {
+        val movedSet = movedIds.toSet()
+        val orderSet = newOrderIds.toSet()
+        widgets = widgets.map {
+            if (it.id in movedSet) it.copy(offsetXDp = offsetX) else it
+        }
+        val byId = widgets.associateBy { it.id }
+        val ordered = newOrderIds.mapNotNull { byId[it] }
+        val rest = widgets.filter { it.id !in orderSet }
+        widgets = rest + ordered
         widgetStore.save(widgets)
     }
 
