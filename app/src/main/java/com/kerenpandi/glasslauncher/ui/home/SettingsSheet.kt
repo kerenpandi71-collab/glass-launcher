@@ -1,6 +1,7 @@
 package com.kerenpandi.glasslauncher.ui.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
@@ -19,6 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -47,10 +49,22 @@ fun SettingsSheet(
                 .padding(start = 20.dp, end = 20.dp, top = 76.dp).navigationBarsPadding()
         ) {
             GlassPanel(shape = RoundedCornerShape(30.dp)) {
-                Column(Modifier.fillMaxWidth().padding(20.dp)) {
+                Column(
+                    Modifier.fillMaxWidth()
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color(0xE52B405A), Color(0xE5162438))
+                            ), RoundedCornerShape(30.dp)
+                        )
+                        .border(1.dp, Color.White.copy(alpha = 0.30f), RoundedCornerShape(30.dp))
+                        .padding(20.dp)
+                ) {
                     Text("Pengaturan", color = Color.White, fontSize = 18.sp,
                         fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(10.dp))
+                    Text(
+                        "Tampilan", color = Color.White.copy(alpha = 0.68f), fontSize = 12.sp
+                    )
                     Text(
                         "Pilih wallpaper",
                         color = Color.White,
