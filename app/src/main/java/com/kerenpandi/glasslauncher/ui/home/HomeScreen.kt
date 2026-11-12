@@ -144,10 +144,6 @@ fun HomeScreen(
                 )
             }
 
-            if (settings.showGlance) {
-                AtAGlance(settings = settings, modifier = Modifier.padding(top = 8.dp))
-            }
-
             WidgetArea(
                 widgets = viewModel.widgets,
                 onRemove = { viewModel.removeWidget(it) },
