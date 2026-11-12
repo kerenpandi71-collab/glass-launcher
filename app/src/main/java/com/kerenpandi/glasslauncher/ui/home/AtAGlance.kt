@@ -41,6 +41,7 @@ fun AtAGlance(
 
     LaunchedEffect(settings.weatherCity) {
         while (true) {
+            var waitMillis = 30 * 60 * 1000L
             if (settings.weatherCity.isBlank()) {
                 weather = null
             } else {
@@ -52,13 +53,15 @@ fun AtAGlance(
                     val fetched = withContext(Dispatchers.IO) {
                         WeatherService.fetch(settings.weatherCity)
                     }
-                    fetched?.let {
-                        weather = it
-                        settings.cacheWeather(it)
+                    if (fetched != null) {
+                        weather = fetched
+                        settings.cacheWeather(fetched)
+                    } else {
+                        waitMillis = 2 * 60 * 1000L
                     }
                 }
             }
-            delay(30 * 60 * 1000L)
+            delay(waitMillis)
         }
     }
 
@@ -74,6 +77,9 @@ fun AtAGlance(
         val hasCalendar = ContextCompat.checkSelfPermission(
             context, Manifest.permission.READ_CALENDAR
         ) == PackageManager.PERMISSION_GRANTED
+        if (weather == null && settings.weatherCity.isBlank()) {
+            GlanceChip("Atur kota cuaca di Pengaturan → At a Glance")
+        }
         weather?.let { wx ->
             GlanceChip(
                 text = "${WeatherService.emoji(wx.code)} ${wx.temperatureC.toInt()}°C · ${wx.city}"

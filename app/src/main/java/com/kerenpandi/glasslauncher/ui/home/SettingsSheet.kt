@@ -9,6 +9,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
 import android.view.WindowManager
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -57,7 +58,6 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
-import androidx.core.content.IntentCompat
 import com.kerenpandi.glasslauncher.BuildConfig
 import com.kerenpandi.glasslauncher.LauncherViewModel
 import com.kerenpandi.glasslauncher.ShizukuActions
@@ -67,6 +67,7 @@ import com.kerenpandi.glasslauncher.data.IconShapes
 import com.kerenpandi.glasslauncher.data.ThemeModes
 import com.kerenpandi.glasslauncher.data.WidgetHosts
 import com.kerenpandi.glasslauncher.ui.glass.GlassPanel
+import com.kerenpandi.glasslauncher.ui.widgets.WidgetPickerDialog
 
 @Composable
 fun SettingsSheet(
@@ -78,6 +79,7 @@ fun SettingsSheet(
     val settings = viewModel.settings
     var hiddenDialogOpen by remember { mutableStateOf(false) }
     var resetConfirmOpen by remember { mutableStateOf(false) }
+    var pickerOpen by remember { mutableStateOf(false) }
     var cityInput by remember(settings.weatherCity) { mutableStateOf(settings.weatherCity) }
 
     val host = remember { WidgetHosts.get(context) }
@@ -88,31 +90,7 @@ fun SettingsSheet(
         val id = pendingWidgetId
         if (result.resultCode == Activity.RESULT_OK && id > 0) {
             viewModel.addWidget(id)
-        } else if (id > 0) {
-            host.deleteAppWidgetId(id)
-        }
-        pendingWidgetId = -1
-    }
-    val pickLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        val id = pendingWidgetId
-        if (result.resultCode == Activity.RESULT_OK && id > 0) {
-            val provider = result.data?.let {
-                IntentCompat.getParcelableExtra(
-                    it,
-                    AppWidgetManager.EXTRA_APPWIDGET_PROVIDER,
-                    AppWidgetProviderInfo::class.java
-                )
-            }
-            val bound = provider?.provider?.let { cn -> manager.bindAppWidgetIdIfAllowed(id, cn) } == true
-            if (bound) {
-                viewModel.addWidget(id)
-            } else {
-                bindLauncher.launch(
-                    Intent(AppWidgetManager.ACTION_APPWIDGET_BIND)
-                        .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id)
-                        .putExtra(AppWidgetManager.EXTRA_APPWIDGET_PROVIDER, provider)
-                )
-            }
+            Toast.makeText(context, "Widget ditambahkan", Toast.LENGTH_SHORT).show()
         } else if (id > 0) {
             host.deleteAppWidgetId(id)
         }
@@ -147,6 +125,7 @@ fun SettingsSheet(
     }
 
     val iconPacks = remember { IconPackStore.installedPacks(context) }
+    val installedProviders = remember { manager.installedProviders }
     var shizukuAvailable by remember { mutableStateOf(ShizukuActions.isBinderAvailable()) }
     var shizukuGranted by remember { mutableStateOf(ShizukuActions.hasPermission()) }
 
@@ -302,14 +281,7 @@ fun SettingsSheet(
                     }
 
                     SectionTitle("Widget")
-                    SettingRow("Tambah widget") {
-                        val id = host.allocateAppWidgetId()
-                        pendingWidgetId = id
-                        pickLauncher.launch(
-                            Intent(AppWidgetManager.ACTION_APPWIDGET_PICK)
-                                .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id)
-                        )
-                    }
+                    SettingRow("Tambah widget") { pickerOpen = true }
                     Text(
                         "Tarik titik di pojok kanan bawah widget untuk mengubah ukuran.",
                         color = Color.White.copy(alpha = 0.6f),
@@ -411,6 +383,30 @@ fun SettingsSheet(
                 }
             }
         }
+    }
+
+    if (pickerOpen) {
+        WidgetPickerDialog(
+            providers = installedProviders,
+            onSelect = { info ->
+                pickerOpen = false
+                val id = host.allocateAppWidgetId()
+                pendingWidgetId = id
+                val bound = manager.bindAppWidgetIdIfAllowed(id, info.provider)
+                if (bound) {
+                    viewModel.addWidget(id)
+                    pendingWidgetId = -1
+                    Toast.makeText(context, "Widget ditambahkan", Toast.LENGTH_SHORT).show()
+                } else {
+                    bindLauncher.launch(
+                        Intent(AppWidgetManager.ACTION_APPWIDGET_BIND)
+                            .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id)
+                            .putExtra(AppWidgetManager.EXTRA_APPWIDGET_PROVIDER, info)
+                    )
+                }
+            },
+            onDismiss = { pickerOpen = false }
+        )
     }
 
     if (hiddenDialogOpen) {

@@ -1,6 +1,7 @@
 package com.kerenpandi.glasslauncher.ui.home
 
 import android.os.Build
+import android.widget.Toast
 import android.view.WindowManager
 
 import androidx.activity.compose.BackHandler
@@ -113,7 +114,9 @@ fun HomeScreen(
             onDoubleTap = {
                 if (!searchOpen && !settingsOpen) {
                     if (SystemActions.isAdminActive(context)) {
-                        SystemActions.lockScreen(context)
+                        if (!SystemActions.lockScreen(context)) {
+                            Toast.makeText(context, "Gagal mengunci layar", Toast.LENGTH_SHORT).show()
+                        }
                     } else {
                         lockPromptOpen = true
                     }

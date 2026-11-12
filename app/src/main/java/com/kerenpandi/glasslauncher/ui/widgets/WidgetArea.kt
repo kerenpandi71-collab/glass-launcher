@@ -24,7 +24,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,10 +55,6 @@ fun WidgetArea(
     val host = remember { WidgetHosts.get(context) }
     val manager = remember { AppWidgetManager.getInstance(context) }
     var resizingId by remember { mutableStateOf<Int?>(null) }
-    DisposableEffect(Unit) {
-        host.startListening()
-        onDispose { host.stopListening() }
-    }
     Column(
         Modifier.fillMaxWidth().padding(top = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -74,6 +69,7 @@ fun WidgetArea(
                 val currentWidth by rememberUpdatedState(widthDp)
                 val currentHeight by rememberUpdatedState(heightDp)
                 val isResizing = resizingId == entry.id
+                var createFailed by remember(entry.id) { mutableStateOf(false) }
                 Box(
                     Modifier.fillMaxWidth().height(heightDp.dp),
                     contentAlignment = Alignment.Center
@@ -83,6 +79,7 @@ fun WidgetArea(
                             try {
                                 host.createView(ctx, entry.id, info)
                             } catch (e: Exception) {
+                                createFailed = true
                                 FrameLayout(ctx)
                             }
                         },
@@ -98,6 +95,13 @@ fun WidgetArea(
                         },
                         modifier = Modifier.width(widthDp.dp).fillMaxHeight()
                     )
+                    if (createFailed) {
+                        Text(
+                            "Widget gagal dimuat",
+                            color = Color.White.copy(alpha = 0.6f),
+                            fontSize = 12.sp
+                        )
+                    }
                     Row(
                         Modifier.align(Alignment.TopEnd).padding(6.dp),
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
