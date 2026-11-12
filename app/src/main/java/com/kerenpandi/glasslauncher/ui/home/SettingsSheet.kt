@@ -72,7 +72,7 @@ fun SettingsSheet(
         if (result.resultCode == Activity.RESULT_OK && id > 0) {
             viewModel.addWidget(id)
         } else if (id > 0) {
-            host.deallocateAppWidgetId(id)
+            host.deleteAppWidgetId(id)
         }
         pendingWidgetId = -1
     }
@@ -97,7 +97,7 @@ fun SettingsSheet(
                 )
             }
         } else if (id > 0) {
-            host.deallocateAppWidgetId(id)
+            host.deleteAppWidgetId(id)
         }
         pendingWidgetId = -1
     }
@@ -255,7 +255,7 @@ fun SettingsSheet(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                info?.loadLabel(manager) ?: "Widget #$id",
+                                info?.providerInfo?.loadLabel(context.packageManager) ?: "Widget #$id",
                                 color = Color.White,
                                 fontSize = 14.sp,
                                 modifier = Modifier.weight(1f)
