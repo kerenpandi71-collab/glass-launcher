@@ -32,7 +32,7 @@ fun HiddenAppsDialog(
         title = { Text("Sembunyikan aplikasi") },
         text = {
             Column {
-                Text("Aplikasi tercentang disembunyikan dari home, drawer, dan pencarian.")
+                Text("Aplikasi tercentang disembunyikan dari home dan pencarian.")
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth().heightIn(max = 380.dp).padding(top = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp)
