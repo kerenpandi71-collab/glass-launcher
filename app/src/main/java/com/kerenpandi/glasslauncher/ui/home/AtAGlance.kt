@@ -26,6 +26,7 @@ import com.kerenpandi.glasslauncher.data.CalendarEvents
 import com.kerenpandi.glasslauncher.data.LauncherSettings
 import com.kerenpandi.glasslauncher.data.WeatherService
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
 @Composable
@@ -39,15 +40,25 @@ fun AtAGlance(
     var nextEvent by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(settings.weatherCity) {
-        if (settings.weatherCity.isBlank()) {
-            weather = null
-            return@LaunchedEffect
-        }
-        weather?.let { if (it.city.equals(settings.weatherCity, ignoreCase = true)) return@LaunchedEffect }
-        val fetched = withContext(Dispatchers.IO) { WeatherService.fetch(settings.weatherCity) }
-        fetched?.let {
-            weather = it
-            settings.cacheWeather(it)
+        while (true) {
+            if (settings.weatherCity.isBlank()) {
+                weather = null
+            } else {
+                val cached = settings.cachedWeather()
+                    ?.takeIf { it.city.equals(settings.weatherCity, ignoreCase = true) }
+                if (cached != null) {
+                    weather = cached
+                } else {
+                    val fetched = withContext(Dispatchers.IO) {
+                        WeatherService.fetch(settings.weatherCity)
+                    }
+                    fetched?.let {
+                        weather = it
+                        settings.cacheWeather(it)
+                    }
+                }
+            }
+            delay(30 * 60 * 1000L)
         }
     }
 

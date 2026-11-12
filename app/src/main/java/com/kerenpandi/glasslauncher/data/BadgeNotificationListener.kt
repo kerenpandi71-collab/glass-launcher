@@ -1,5 +1,6 @@
 package com.kerenpandi.glasslauncher.data
 
+import android.content.ComponentName
 import android.content.Context
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
@@ -27,6 +28,10 @@ class BadgeNotificationListener : NotificationListenerService() {
         val map = _counts.value.toMutableMap()
         map.merge(sbn.packageName, 1, Int::plus)
         _counts.value = map
+    }
+
+    override fun onListenerDisconnected() {
+        requestRebind(ComponentName(this, BadgeNotificationListener::class.java))
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification) {

@@ -11,6 +11,7 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,12 +19,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,13 +47,15 @@ import com.kerenpandi.glasslauncher.data.WidgetHosts
 fun WidgetArea(
     widgets: List<WidgetEntry>,
     onRemove: (Int) -> Unit,
-    onResize: (Int, Int, Int) -> Unit
+    onResize: (Int, Int, Int) -> Unit,
+    onResizeEnd: () -> Unit
 ) {
     if (widgets.isEmpty()) return
     val context = LocalContext.current
     val density = LocalDensity.current.density
     val host = remember { WidgetHosts.get(context) }
     val manager = remember { AppWidgetManager.getInstance(context) }
+    var resizingId by remember { mutableStateOf<Int?>(null) }
     DisposableEffect(Unit) {
         host.startListening()
         onDispose { host.stopListening() }
@@ -63,6 +71,9 @@ fun WidgetArea(
                 val minHeightDp = info.minHeight.coerceAtLeast(60)
                 val widthDp = entry.widthDp.coerceIn(minWidthDp, 420)
                 val heightDp = entry.heightDp.coerceIn(minHeightDp, 320)
+                val currentWidth by rememberUpdatedState(widthDp)
+                val currentHeight by rememberUpdatedState(heightDp)
+                val isResizing = resizingId == entry.id
                 Box(
                     Modifier.fillMaxWidth().height(heightDp.dp),
                     contentAlignment = Alignment.Center
@@ -87,40 +98,76 @@ fun WidgetArea(
                         },
                         modifier = Modifier.width(widthDp.dp).fillMaxHeight()
                     )
-                    Box(
-                        Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(6.dp)
-                            .size(22.dp)
-                            .clip(CircleShape)
-                            .background(Color.Black.copy(alpha = 0.55f))
-                            .clickable { onRemove(entry.id) },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("×", color = Color.White, fontSize = 13.sp)
-                    }
-                    val currentWidth by rememberUpdatedState(widthDp)
-                    val currentHeight by rememberUpdatedState(heightDp)
-                    Box(
-                        Modifier
-                            .align(Alignment.BottomEnd)
-                            .size(26.dp)
-                            .pointerInput(entry.id) {
-                                detectDragGestures { change, amount ->
-                                    change.consume()
-                                    onResize(
-                                        entry.id,
-                                        (currentWidth + (amount.x / density).toInt()).coerceIn(minWidthDp, 420),
-                                        (currentHeight + (amount.y / density).toInt()).coerceIn(minHeightDp, 320)
-                                    )
-                                }
-                            },
-                        contentAlignment = Alignment.Center
+                    Row(
+                        Modifier.align(Alignment.TopEnd).padding(6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Box(
-                            Modifier.size(14.dp).clip(CircleShape)
-                                .background(Color.White.copy(alpha = 0.35f))
-                        )
+                            Modifier.size(24.dp)
+                                .clip(CircleShape)
+                                .background(Color.Black.copy(alpha = 0.55f))
+                                .clickable {
+                                    if (isResizing) {
+                                        resizingId = null
+                                        onResizeEnd()
+                                    } else {
+                                        resizingId = entry.id
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.Edit,
+                                contentDescription = "Ubah ukuran widget",
+                                tint = Color.White,
+                                modifier = Modifier.size(13.dp)
+                            )
+                        }
+                        Box(
+                            Modifier.size(24.dp)
+                                .clip(CircleShape)
+                                .background(Color.Black.copy(alpha = 0.55f))
+                                .clickable { onRemove(entry.id) },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = "Hapus widget",
+                                tint = Color.White,
+                                modifier = Modifier.size(13.dp)
+                            )
+                        }
+                    }
+                    if (isResizing) {
+                        Box(
+                            Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(4.dp)
+                                .size(30.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFA8C8FF).copy(alpha = 0.85f))
+                                .pointerInput(entry.id) {
+                                    detectDragGestures(
+                                        onDragEnd = { onResizeEnd() },
+                                        onDragCancel = { onResizeEnd() }
+                                    ) { change, amount ->
+                                        change.consume()
+                                        onResize(
+                                            entry.id,
+                                            (currentWidth + (amount.x / density).toInt())
+                                                .coerceIn(minWidthDp, 420),
+                                            (currentHeight + (amount.y / density).toInt())
+                                                .coerceIn(minHeightDp, 320)
+                                        )
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Box(
+                                Modifier.size(12.dp).clip(CircleShape)
+                                    .background(Color.White)
+                            )
+                        }
                     }
                 }
             }

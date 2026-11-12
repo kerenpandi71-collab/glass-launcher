@@ -148,7 +148,8 @@ fun HomeScreen(
             WidgetArea(
                 widgets = viewModel.widgets,
                 onRemove = { viewModel.removeWidget(it) },
-                onResize = { id, w, h -> viewModel.resizeWidget(id, w, h) }
+                onResize = { id, w, h -> viewModel.resizeWidget(id, w, h) },
+                onResizeEnd = { viewModel.saveWidgets() }
             )
 
             val pagerState = rememberPagerState(pageCount = { pageCount })

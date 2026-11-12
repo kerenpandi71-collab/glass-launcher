@@ -402,6 +402,12 @@ fun SettingsSheet(
                         modifier = Modifier.padding(horizontal = 6.dp)
                     )
                     SettingRow("Reset pengaturan") { resetConfirmOpen = true }
+
+                    Spacer(Modifier.height(12.dp))
+                    TextButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("Tutup") }
                 }
             }
         }

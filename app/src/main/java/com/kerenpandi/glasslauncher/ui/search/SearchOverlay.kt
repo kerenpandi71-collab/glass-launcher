@@ -53,7 +53,10 @@ fun SearchOverlay(
     val results = remember(apps, query) {
         val trimmed = query.trim()
         if (trimmed.isEmpty()) emptyList()
-        else apps.filter { it.label.contains(trimmed, ignoreCase = true) }
+        else apps.filter {
+            it.label.contains(trimmed, ignoreCase = true) ||
+                it.packageName.contains(trimmed, ignoreCase = true)
+        }
     }
 
     LaunchedEffect(Unit) { focusRequester.requestFocus() }

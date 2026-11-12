@@ -96,7 +96,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         }
         list.add(newIndex.coerceAtLeast(0), item)
         apps = list
-        orderStore.saveOrder(list)
+        orderStore.saveOrder(list + loadedApps.filter { it.stableKey() in settings.hiddenApps })
     }
 
     fun addToDock(app: AppInfo) {
@@ -170,6 +170,9 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         widgets = widgets.map {
             if (it.id == id) it.copy(widthDp = widthDp, heightDp = heightDp) else it
         }
+    }
+
+    fun saveWidgets() {
         widgetStore.save(widgets)
     }
 
