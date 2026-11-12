@@ -52,52 +52,52 @@ class LauncherSettings(context: Context) {
     var hiddenApps by mutableStateOf(prefs.getStringSet(KEY_HIDDEN, emptySet())?.toSet() ?: emptySet<String>())
         private set
 
-    fun setThemeMode(value: String) {
+    fun updateThemeMode(value: String) {
         themeMode = value
         prefs.edit().putString(KEY_THEME, value).apply()
     }
 
-    fun setDynamicColor(value: Boolean) {
+    fun updateDynamicColor(value: Boolean) {
         dynamicColor = value
         prefs.edit().putBoolean(KEY_DYNAMIC_COLOR, value).apply()
     }
 
-    fun setGridColumns(value: Int) {
+    fun updateGridColumns(value: Int) {
         gridColumns = value
         prefs.edit().putInt(KEY_GRID_COLUMNS, value).apply()
     }
 
-    fun setIconSizeDp(value: Int) {
+    fun updateIconSizeDp(value: Int) {
         iconSizeDp = value
         prefs.edit().putInt(KEY_ICON_SIZE, value).apply()
     }
 
-    fun setShowLabels(value: Boolean) {
+    fun updateShowLabels(value: Boolean) {
         showLabels = value
         prefs.edit().putBoolean(KEY_SHOW_LABELS, value).apply()
     }
 
-    fun setIconShape(value: String) {
+    fun updateIconShape(value: String) {
         iconShape = value
         prefs.edit().putString(KEY_ICON_SHAPE, value).apply()
     }
 
-    fun setIconPackPackage(value: String) {
+    fun updateIconPackPackage(value: String) {
         iconPackPackage = value
         prefs.edit().putString(KEY_ICON_PACK, value).apply()
     }
 
-    fun setNotificationBadges(value: Boolean) {
+    fun updateNotificationBadges(value: Boolean) {
         notificationBadges = value
         prefs.edit().putBoolean(KEY_BADGES, value).apply()
     }
 
-    fun setShowGlance(value: Boolean) {
+    fun updateShowGlance(value: Boolean) {
         showGlance = value
         prefs.edit().putBoolean(KEY_GLANCE, value).apply()
     }
 
-    fun setWeatherCity(value: String) {
+    fun updateWeatherCity(value: String) {
         weatherCity = value.trim()
         prefs.edit().putString(KEY_WEATHER_CITY, weatherCity).apply()
     }

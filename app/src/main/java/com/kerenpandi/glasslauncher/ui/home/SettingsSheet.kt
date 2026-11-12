@@ -152,27 +152,27 @@ fun SettingsSheet(
                             ThemeModes.LIGHT to "Terang"
                         ),
                         selected = settings.themeMode,
-                        onSelect = { settings.setThemeMode(it) }
+                        onSelect = { settings.updateThemeMode(it) }
                     )
                     SwitchRow("Warna dinamis (Material You)", settings.dynamicColor) {
-                        settings.setDynamicColor(it)
+                        settings.updateDynamicColor(it)
                     }
                     ChipRow(
                         options = listOf(4 to "4 kolom", 5 to "5 kolom", 6 to "6 kolom"),
                         selected = settings.gridColumns,
-                        onSelect = { settings.setGridColumns(it) }
+                        onSelect = { settings.updateGridColumns(it) }
                     )
                     Column(Modifier.padding(horizontal = 6.dp, vertical = 8.dp)) {
                         Text("Ukuran ikon: ${settings.iconSizeDp} dp", color = Color.White, fontSize = 14.sp)
                         Slider(
                             value = settings.iconSizeDp.toFloat(),
-                            onValueChange = { settings.setIconSizeDp(it.toInt()) },
+                            onValueChange = { settings.updateIconSizeDp(it.toInt()) },
                             valueRange = 40f..72f,
                             steps = 8
                         )
                     }
                     SwitchRow("Tampilkan label ikon", settings.showLabels) {
-                        settings.setShowLabels(it)
+                        settings.updateShowLabels(it)
                     }
                     ChipRow(
                         options = listOf(
@@ -182,7 +182,7 @@ fun SettingsSheet(
                             IconShapes.SQUARE to "Kotak"
                         ),
                         selected = settings.iconShape,
-                        onSelect = { settings.setIconShape(it) }
+                        onSelect = { settings.updateIconShape(it) }
                     )
                     if (iconPacks.isEmpty()) {
                         Text(
@@ -195,13 +195,13 @@ fun SettingsSheet(
                         ChipRow(
                             options = listOf("" to "Bawaan") + iconPacks,
                             selected = settings.iconPackPackage,
-                            onSelect = { settings.setIconPackPackage(it) }
+                            onSelect = { settings.updateIconPackPackage(it) }
                         )
                     }
 
                     SectionTitle("Notifikasi")
                     SwitchRow("Badge jumlah notifikasi", settings.notificationBadges) {
-                        settings.setNotificationBadges(it)
+                        settings.updateNotificationBadges(it)
                     }
                     if (!listenerEnabled) {
                         SettingRow("Izinkan akses notifikasi") {
@@ -216,7 +216,7 @@ fun SettingsSheet(
 
                     SectionTitle("At a Glance")
                     SwitchRow("Tampilkan cuaca & agenda", settings.showGlance) {
-                        settings.setShowGlance(it)
+                        settings.updateShowGlance(it)
                     }
                     Row(
                         Modifier.fillMaxWidth().padding(horizontal = 6.dp),
@@ -229,7 +229,7 @@ fun SettingsSheet(
                             label = { Text("Kota cuaca") },
                             modifier = Modifier.weight(1f)
                         )
-                        TextButton(onClick = { settings.setWeatherCity(cityInput) }) {
+                        TextButton(onClick = { settings.updateWeatherCity(cityInput) }) {
                             Text("Simpan")
                         }
                     }
