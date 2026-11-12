@@ -108,7 +108,10 @@ fun SettingsSheet(
                 pendingWidgetId = -1
             }
         } else {
-            if (id > 0) runCatching { host.deleteAppWidgetId(id) }
+            if (id > 0) {
+                runCatching { host.deleteAppWidgetId(id) }
+                Toast.makeText(context, "Pemasangan widget dibatalkan", Toast.LENGTH_SHORT).show()
+            }
             pendingWidgetId = -1
         }
     }
@@ -394,11 +397,17 @@ fun SettingsSheet(
                         Toast.makeText(context, "Widget ditambahkan", Toast.LENGTH_SHORT).show()
                     }
                 } else {
-                    bindLauncher.launch(
-                        Intent(AppWidgetManager.ACTION_APPWIDGET_BIND)
-                            .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id)
-                            .putExtra(AppWidgetManager.EXTRA_APPWIDGET_PROVIDER, info)
-                    )
+                    runCatching {
+                        bindLauncher.launch(
+                            Intent(AppWidgetManager.ACTION_APPWIDGET_BIND)
+                                .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id)
+                                .putExtra(AppWidgetManager.EXTRA_APPWIDGET_PROVIDER, info.provider)
+                        )
+                    }.onFailure {
+                        host.deleteAppWidgetId(id)
+                        pendingWidgetId = -1
+                        Toast.makeText(context, "Tidak bisa membuka dialog izin widget", Toast.LENGTH_SHORT).show()
+                    }
                 }
             },
             onDismiss = { pickerOpen = false }
