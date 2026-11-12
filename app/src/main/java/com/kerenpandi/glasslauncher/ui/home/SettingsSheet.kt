@@ -1,11 +1,9 @@
 package com.kerenpandi.glasslauncher.ui.home
 
-import android.Manifest
 import android.app.Activity
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProviderInfo
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
 import android.view.WindowManager
@@ -80,7 +78,6 @@ fun SettingsSheet(
     var hiddenDialogOpen by remember { mutableStateOf(false) }
     var resetConfirmOpen by remember { mutableStateOf(false) }
     var pickerOpen by remember { mutableStateOf(false) }
-    var cityInput by remember(settings.weatherCity) { mutableStateOf(settings.weatherCity) }
 
     val host = remember { WidgetHosts.get(context) }
     val manager = remember { AppWidgetManager.getInstance(context) }
@@ -102,10 +99,8 @@ fun SettingsSheet(
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let(viewModel::importLayout)
     }
-    val calendarPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
     var listenerEnabled by remember { mutableStateOf(false) }
-    var calendarGranted by remember { mutableStateOf(false) }
     var adminActive by remember { mutableStateOf(false) }
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -114,9 +109,6 @@ fun SettingsSheet(
                 listenerEnabled = NotificationManagerCompat
                     .getEnabledListenerPackages(context)
                     .contains(context.packageName)
-                calendarGranted = ContextCompat.checkSelfPermission(
-                    context, Manifest.permission.READ_CALENDAR
-                ) == PackageManager.PERMISSION_GRANTED
                 adminActive = SystemActions.isAdminActive(context)
             }
         }
@@ -159,6 +151,7 @@ fun SettingsSheet(
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
                     .padding(horizontal = 14.dp, vertical = 40.dp)
+                    .background(Color(0xF21B2A40), RoundedCornerShape(30.dp))
                     .heightIn(max = 660.dp)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
@@ -253,31 +246,6 @@ fun SettingsSheet(
                             fontSize = 12.sp,
                             modifier = Modifier.padding(horizontal = 6.dp)
                         )
-                    }
-
-                    SectionTitle("At a Glance")
-                    SwitchRow("Tampilkan cuaca & agenda", settings.showGlance) {
-                        settings.updateShowGlance(it)
-                    }
-                    Row(
-                        Modifier.fillMaxWidth().padding(horizontal = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        OutlinedTextField(
-                            value = cityInput,
-                            onValueChange = { cityInput = it },
-                            singleLine = true,
-                            label = { Text("Kota cuaca") },
-                            modifier = Modifier.weight(1f)
-                        )
-                        TextButton(onClick = { settings.updateWeatherCity(cityInput) }) {
-                            Text("Simpan")
-                        }
-                    }
-                    if (!calendarGranted) {
-                        SettingRow("Izinkan akses kalender") {
-                            calendarPermission.launch(Manifest.permission.READ_CALENDAR)
-                        }
                     }
 
                     SectionTitle("Widget")
