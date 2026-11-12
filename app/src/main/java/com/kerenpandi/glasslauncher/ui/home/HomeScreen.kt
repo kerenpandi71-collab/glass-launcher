@@ -2,6 +2,7 @@ package com.kerenpandi.glasslauncher.ui.home
 
 import android.os.Build
 import android.view.WindowManager
+import android.appwidget.AppWidgetHost
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -27,6 +28,8 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.activity.compose.BackHandler
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -60,13 +63,30 @@ private sealed interface HomeEntry {
 @Composable
 fun HomeScreen(
     viewModel: LauncherViewModel,
-    onSetWallpaper: () -> Unit
+    onSetWallpaper: () -> Unit,
+    appWidgetHost: AppWidgetHost,
+    widgetIds: List<Int>,
+    onAddWidget: () -> Unit,
+    onRemoveWidget: (Int) -> Unit
 ) {
     var settingsOpen by remember { mutableStateOf(false) }
     var recentOpen by remember { mutableStateOf(false) }
     var selectedFolder by remember { mutableStateOf<LauncherFolder?>(null) }
     var folderPickerApp by remember { mutableStateOf<AppInfo?>(null) }
     var createFolderApp by remember { mutableStateOf<AppInfo?>(null) }
+
+    BackHandler(
+        enabled = settingsOpen || recentOpen || selectedFolder != null ||
+            folderPickerApp != null || createFolderApp != null
+    ) {
+        when {
+            createFolderApp != null -> createFolderApp = null
+            folderPickerApp != null -> folderPickerApp = null
+            selectedFolder != null -> selectedFolder = null
+            recentOpen -> recentOpen = false
+            settingsOpen -> settingsOpen = false
+        }
+    }
 
     val apps = viewModel.apps
     val dockApps = viewModel.dockApps
@@ -97,6 +117,14 @@ fun HomeScreen(
                     onClick = { settingsOpen = true }
                 )
             }
+
+            HomeWidgets(
+                context = LocalContext.current,
+                host = appWidgetHost,
+                widgetIds = widgetIds,
+                onAdd = onAddWidget,
+                onRemove = onRemoveWidget
+            )
 
             val pagerState = rememberPagerState(pageCount = { pageCount })
             HorizontalPager(
