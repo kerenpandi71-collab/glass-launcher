@@ -63,7 +63,6 @@ fun HomeScreen(
     onSetWallpaper: () -> Unit
 ) {
     var settingsOpen by remember { mutableStateOf(false) }
-    var recentOpen by remember { mutableStateOf(false) }
     var selectedFolder by remember { mutableStateOf<LauncherFolder?>(null) }
     var folderPickerApp by remember { mutableStateOf<AppInfo?>(null) }
     var createFolderApp by remember { mutableStateOf<AppInfo?>(null) }
@@ -89,7 +88,6 @@ fun HomeScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                TextButton(onClick = { recentOpen = true }) { Text("Recent", color = Color.White) }
                 ClockHeader()
                 GlassIconButton(
                     icon = Icons.Default.Settings,
@@ -152,8 +150,6 @@ fun HomeScreen(
             )
         }
     }
-
-    if (recentOpen) RecentAppsDialog(onDismiss = { recentOpen = false })
 
     selectedFolder?.let { folder ->
         FolderDialog(
