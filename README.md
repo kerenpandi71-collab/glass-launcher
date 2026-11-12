@@ -11,11 +11,10 @@ Launcher Android bertema liquid glass ala iOS, dibangun dengan Kotlin + Jetpack 
 - Folder bergaya iPhone: panel tengah, grid ikon 3 kolom, edit nama, tambah dan keluarkan aplikasi.
 - Aplikasi clone / Dual Apps melalui LauncherApps dan profil pengguna.
 - Info aplikasi dan uninstall melalui dialog sistem Android.
-- Pencarian aplikasi (overlay pencarian dan kolom cari di drawer).
+- Pencarian aplikasi cepat (geser ke atas atau ikon cari).
 - Badge jumlah notifikasi per aplikasi melalui NotificationListenerService.
-- Gestur: geser atas membuka drawer, geser bawah membuka panel notifikasi, double-tap mengunci layar (via device admin).
-- Widget Android di home screen melalui AppWidgetHost.
-- App drawer dengan kolom pencarian.
+- Gestur: geser atas membuka pencarian, geser bawah membuka panel notifikasi, double-tap mengunci layar (via device admin).
+- Widget Android di home screen dengan pengubahan ukuran (AppWidgetHost).
 - Sembunyikan aplikasi dari home, drawer, dan pencarian.
 - Kustomisasi: jumlah kolom grid, ukuran ikon, bentuk ikon, label, dan icon pack format ADW.
 - Backup dan restore layout serta pengaturan (JSON via Storage Access Framework).
@@ -30,6 +29,14 @@ Launcher Android bertema liquid glass ala iOS, dibangun dengan Kotlin + Jetpack 
 - Halaman pager tetangga di-pre-compose.
 - Data halaman di-memoize agar daftar tidak di-chunk ulang pada setiap recomposition.
 - Grid halaman dibatasi enam baris per halaman.
+
+## Shizuku (opsional)
+
+Fitur "Hentikan aplikasi" bekerja optimal dengan [Shizuku](https://shizuku.rikka.app/). Saat Shizuku aktif, launcher akan meminta izin dan memakai `am force-stop`. Tanpa Shizuku, launcher otomatis memakai `killBackgroundProcesses` sebagai fallback.
+
+## Rilis
+
+Metadata fastlane untuk F-Droid tersedia di `fastlane/metadata/android/`. APK debug/release dapat dibangun lewat GitHub Actions.
 
 ## Build
 

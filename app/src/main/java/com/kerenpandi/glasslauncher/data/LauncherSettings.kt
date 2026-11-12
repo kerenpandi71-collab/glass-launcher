@@ -129,6 +129,11 @@ class LauncherSettings(context: Context) {
             .apply()
     }
 
+    fun reset() {
+        prefs.edit().clear().apply()
+        reload()
+    }
+
     fun reload() {
         themeMode = prefs.getString(KEY_THEME, ThemeModes.DARK) ?: ThemeModes.DARK
         dynamicColor = prefs.getBoolean(KEY_DYNAMIC_COLOR, false)

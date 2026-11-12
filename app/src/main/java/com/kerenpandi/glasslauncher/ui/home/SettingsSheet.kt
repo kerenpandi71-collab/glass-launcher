@@ -5,7 +5,10 @@ import android.app.Activity
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProviderInfo
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.provider.Settings
+import android.view.WindowManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -19,11 +22,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
@@ -31,6 +36,9 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,12 +47,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import androidx.core.content.IntentCompat
+import com.kerenpandi.glasslauncher.BuildConfig
 import com.kerenpandi.glasslauncher.LauncherViewModel
+import com.kerenpandi.glasslauncher.ShizukuActions
 import com.kerenpandi.glasslauncher.SystemActions
 import com.kerenpandi.glasslauncher.data.IconPackStore
 import com.kerenpandi.glasslauncher.data.IconShapes
@@ -61,6 +77,7 @@ fun SettingsSheet(
     val context = LocalContext.current
     val settings = viewModel.settings
     var hiddenDialogOpen by remember { mutableStateOf(false) }
+    var resetConfirmOpen by remember { mutableStateOf(false) }
     var cityInput by remember(settings.weatherCity) { mutableStateOf(settings.weatherCity) }
 
     val host = remember { WidgetHosts.get(context) }
@@ -109,36 +126,74 @@ fun SettingsSheet(
     }
     val calendarPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
-    val listenerEnabled = remember {
-        NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName)
-    }
-    val iconPacks = remember { IconPackStore.installedPacks(context) }
-    val calendarGranted = remember {
-        androidx.core.content.ContextCompat.checkSelfPermission(
-            context, Manifest.permission.READ_CALENDAR
-        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+    var listenerEnabled by remember { mutableStateOf(false) }
+    var calendarGranted by remember { mutableStateOf(false) }
+    var adminActive by remember { mutableStateOf(false) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                listenerEnabled = NotificationManagerCompat
+                    .getEnabledListenerPackages(context)
+                    .contains(context.packageName)
+                calendarGranted = ContextCompat.checkSelfPermission(
+                    context, Manifest.permission.READ_CALENDAR
+                ) == PackageManager.PERMISSION_GRANTED
+                adminActive = SystemActions.isAdminActive(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    Box(
-        Modifier.fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.35f))
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onDismiss
-            )
+    val iconPacks = remember { IconPackStore.installedPacks(context) }
+    var shizukuAvailable by remember { mutableStateOf(ShizukuActions.isBinderAvailable()) }
+    var shizukuGranted by remember { mutableStateOf(ShizukuActions.hasPermission()) }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        )
     ) {
-        Column(
-            Modifier.align(Alignment.TopCenter).fillMaxWidth()
+        val dialogView = LocalView.current
+        androidx.compose.runtime.SideEffect {
+            val window = (dialogView.parent as? DialogWindowProvider)?.window
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && window != null) {
+                window.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+                window.setBackgroundBlurRadius(38)
+                window.setDimAmount(0.20f)
+            }
+        }
+        Box(
+            Modifier.fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.35f))
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
-                    indication = null
-                ) { }
-                .padding(start = 20.dp, end = 20.dp, top = 76.dp).navigationBarsPadding()
-                .verticalScroll(rememberScrollState())
+                    indication = null,
+                    onClick = onDismiss
+                )
         ) {
-            GlassPanel(shape = RoundedCornerShape(30.dp)) {
-                Column(Modifier.fillMaxWidth().padding(20.dp)) {
+            GlassPanel(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 40.dp)
+                    .heightIn(max = 660.dp)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { },
+                shape = RoundedCornerShape(30.dp)
+            ) {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(20.dp)
+                        .navigationBarsPadding()
+                ) {
                     Text("Pengaturan", color = Color.White, fontSize = 18.sp,
                         fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(6.dp))
@@ -212,6 +267,13 @@ fun SettingsSheet(
                                 )
                             }
                         }
+                    } else {
+                        Text(
+                            "Akses notifikasi aktif",
+                            color = Color(0xFF8BC34A),
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(horizontal = 6.dp)
+                        )
                     }
 
                     SectionTitle("At a Glance")
@@ -248,29 +310,57 @@ fun SettingsSheet(
                                 .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id)
                         )
                     }
-                    viewModel.widgetIds.forEach { id ->
-                        val info = manager.getAppWidgetInfo(id)
+                    Text(
+                        "Tarik titik di pojok kanan bawah widget untuk mengubah ukuran.",
+                        color = Color.White.copy(alpha = 0.6f),
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(horizontal = 6.dp)
+                    )
+                    viewModel.widgets.forEach { entry ->
+                        val info = manager.getAppWidgetInfo(entry.id)
                         val label = info?.provider?.let { cn ->
                             runCatching {
                                 context.packageManager.getApplicationLabel(
                                     context.packageManager.getApplicationInfo(cn.packageName, 0)
                                 ).toString()
                             }.getOrNull()
-                        } ?: "Widget #$id"
+                        } ?: "Widget #${entry.id}"
                         Row(
                             Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                label,
+                                "$label · ${entry.widthDp}×${entry.heightDp} dp",
                                 color = Color.White,
                                 fontSize = 14.sp,
                                 modifier = Modifier.weight(1f)
                             )
                             TextButton(onClick = {
-                                runCatching { host.deleteAppWidgetId(id) }
-                                viewModel.removeWidget(id)
+                                runCatching { host.deleteAppWidgetId(entry.id) }
+                                viewModel.removeWidget(entry.id)
                             }) { Text("Hapus") }
+                        }
+                    }
+
+                    SectionTitle("Shizuku")
+                    Text(
+                        when {
+                            !shizukuAvailable -> "Shizuku tidak terhubung"
+                            !shizukuGranted -> "Izin Shizuku belum diberikan"
+                            else -> "Shizuku aktif"
+                        },
+                        color = when {
+                            !shizukuAvailable -> Color.White.copy(alpha = 0.6f)
+                            !shizukuGranted -> Color(0xFFFFB74D)
+                            else -> Color(0xFF8BC34A)
+                        },
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(horizontal = 6.dp)
+                    )
+                    SettingRow("Minta izin Shizuku") {
+                        ShizukuActions.requestPermission { granted ->
+                            shizukuGranted = granted && ShizukuActions.hasPermission()
+                            shizukuAvailable = ShizukuActions.isBinderAvailable()
                         }
                     }
 
@@ -287,10 +377,10 @@ fun SettingsSheet(
 
                     SectionTitle("Gestur")
                     SettingRow(
-                        if (SystemActions.isAdminActive(context)) "Kunci layar sekarang"
+                        if (adminActive) "Kunci layar sekarang"
                         else "Aktifkan kunci layar (double-tap)"
                     ) {
-                        if (SystemActions.isAdminActive(context)) {
+                        if (adminActive) {
                             SystemActions.lockScreen(context)
                             onDismiss()
                         } else {
@@ -298,11 +388,20 @@ fun SettingsSheet(
                         }
                     }
                     Text(
-                        "Geser ke atas: buka drawer · Geser ke bawah: panel notifikasi · Double-tap: kunci layar",
+                        "Geser ke atas: pencarian · Geser ke bawah: panel notifikasi · Double-tap: kunci layar",
                         color = Color.White.copy(alpha = 0.6f),
                         fontSize = 12.sp,
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 8.dp)
                     )
+
+                    SectionTitle("Tentang")
+                    Text(
+                        "Glass Launcher v${BuildConfig.VERSION_NAME} (build ${BuildConfig.VERSION_CODE})",
+                        color = Color.White.copy(alpha = 0.8f),
+                        fontSize = 13.sp,
+                        modifier = Modifier.padding(horizontal = 6.dp)
+                    )
+                    SettingRow("Reset pengaturan") { resetConfirmOpen = true }
                 }
             }
         }
@@ -314,6 +413,23 @@ fun SettingsSheet(
             hiddenKeys = settings.hiddenApps,
             onToggle = { viewModel.toggleHiddenApp(it) },
             onDismiss = { hiddenDialogOpen = false }
+        )
+    }
+
+    if (resetConfirmOpen) {
+        AlertDialog(
+            onDismissRequest = { resetConfirmOpen = false },
+            title = { Text("Reset pengaturan") },
+            text = { Text("Semua pengaturan tampilan akan dikembalikan ke bawaan. Susunan ikon, folder, dock, dan widget tidak diubah.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    settings.reset()
+                    resetConfirmOpen = false
+                }) { Text("Reset") }
+            },
+            dismissButton = {
+                TextButton(onClick = { resetConfirmOpen = false }) { Text("Batal") }
+            }
         )
     }
 }

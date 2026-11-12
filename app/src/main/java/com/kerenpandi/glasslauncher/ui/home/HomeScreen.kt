@@ -59,7 +59,6 @@ import com.kerenpandi.glasslauncher.ui.common.AppMenuItem
 import com.kerenpandi.glasslauncher.ui.common.ClockHeader
 import com.kerenpandi.glasslauncher.ui.common.GlassIconButton
 import com.kerenpandi.glasslauncher.ui.common.cachedAppIcon
-import com.kerenpandi.glasslauncher.ui.drawer.AppDrawer
 import com.kerenpandi.glasslauncher.ui.glass.GlassPanel
 import com.kerenpandi.glasslauncher.ui.glass.GlassScrim
 import com.kerenpandi.glasslauncher.ui.search.SearchOverlay
@@ -76,7 +75,6 @@ fun HomeScreen(
     onSetWallpaper: () -> Unit
 ) {
     var settingsOpen by remember { mutableStateOf(false) }
-    var drawerOpen by remember { mutableStateOf(false) }
     var searchOpen by remember { mutableStateOf(false) }
     var lockPromptOpen by remember { mutableStateOf(false) }
     var selectedFolder by remember { mutableStateOf<LauncherFolder?>(null) }
@@ -100,21 +98,20 @@ fun HomeScreen(
     val dockFull = dockApps.size >= LauncherViewModel.DOCK_CAPACITY
 
     BackHandler(enabled = settingsOpen) { settingsOpen = false }
-    BackHandler(enabled = drawerOpen) { drawerOpen = false }
     BackHandler(enabled = searchOpen) { searchOpen = false }
 
     Box(
         Modifier.fillMaxSize().homeGestures(
             onSwipeUp = {
-                if (!drawerOpen && !searchOpen && !settingsOpen) drawerOpen = true
+                if (!searchOpen && !settingsOpen) searchOpen = true
             },
             onSwipeDown = {
-                if (!drawerOpen && !searchOpen && !settingsOpen) {
+                if (!searchOpen && !settingsOpen) {
                     SystemActions.expandNotificationsPanel(context)
                 }
             },
             onDoubleTap = {
-                if (!drawerOpen && !searchOpen && !settingsOpen) {
+                if (!searchOpen && !settingsOpen) {
                     if (SystemActions.isAdminActive(context)) {
                         SystemActions.lockScreen(context)
                     } else {
@@ -149,8 +146,9 @@ fun HomeScreen(
             }
 
             WidgetArea(
-                widgetIds = viewModel.widgetIds,
-                onRemove = { viewModel.removeWidget(it) }
+                widgets = viewModel.widgets,
+                onRemove = { viewModel.removeWidget(it) },
+                onResize = { id, w, h -> viewModel.resizeWidget(id, w, h) }
             )
 
             val pagerState = rememberPagerState(pageCount = { pageCount })
@@ -207,22 +205,6 @@ fun HomeScreen(
                 viewModel = viewModel,
                 onSetWallpaper = onSetWallpaper,
                 onDismiss = { settingsOpen = false }
-            )
-        }
-
-        AnimatedVisibility(
-            visible = drawerOpen,
-            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
-            modifier = Modifier.fillMaxSize()
-        ) {
-            AppDrawer(
-                apps = apps,
-                onLaunch = {
-                    viewModel.launch(it)
-                    drawerOpen = false
-                },
-                onDismiss = { drawerOpen = false }
             )
         }
 

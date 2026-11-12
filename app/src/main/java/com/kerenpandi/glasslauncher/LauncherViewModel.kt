@@ -19,6 +19,7 @@ import com.kerenpandi.glasslauncher.data.BadgeNotificationListener
 import com.kerenpandi.glasslauncher.data.LauncherFolder
 import com.kerenpandi.glasslauncher.data.LauncherSettings
 import com.kerenpandi.glasslauncher.data.OrderStore
+import com.kerenpandi.glasslauncher.data.WidgetEntry
 import com.kerenpandi.glasslauncher.data.WidgetStore
 import com.kerenpandi.glasslauncher.data.stableKey
 import java.util.UUID
@@ -41,7 +42,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var folders by mutableStateOf<List<LauncherFolder>>(emptyList())
         private set
-    var widgetIds by mutableStateOf<List<Int>>(emptyList())
+    var widgets by mutableStateOf<List<WidgetEntry>>(emptyList())
         private set
     var badges by mutableStateOf<Map<String, Int>>(emptyMap())
         private set
@@ -65,7 +66,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
             loadedApps = orderStore.applyOrder(loaded)
             reapplyFilters()
             folders = orderStore.loadFolders(loaded)
-            widgetIds = widgetStore.prune(getApplication())
+            widgets = widgetStore.prune(getApplication())
         }
     }
 
@@ -155,14 +156,21 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun addWidget(id: Int) {
-        if (id in widgetIds) return
-        widgetIds = widgetIds + id
-        widgetStore.save(widgetIds)
+        if (widgets.any { it.id == id }) return
+        widgets = widgets + WidgetEntry(id, WidgetStore.DEFAULT_WIDTH, WidgetStore.DEFAULT_HEIGHT)
+        widgetStore.save(widgets)
     }
 
     fun removeWidget(id: Int) {
-        widgetIds = widgetIds - id
-        widgetStore.save(widgetIds)
+        widgets = widgets.filterNot { it.id == id }
+        widgetStore.save(widgets)
+    }
+
+    fun resizeWidget(id: Int, widthDp: Int, heightDp: Int) {
+        widgets = widgets.map {
+            if (it.id == id) it.copy(widthDp = widthDp, heightDp = heightDp) else it
+        }
+        widgetStore.save(widgets)
     }
 
     fun exportLayout(uri: Uri) {
