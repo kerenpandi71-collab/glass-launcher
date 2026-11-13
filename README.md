@@ -17,7 +17,6 @@ Launcher Android bertema liquid glass ala iOS, dibangun dengan Kotlin + Jetpack 
 - Sembunyikan aplikasi dari home, drawer, dan pencarian.
 - Kustomisasi: jumlah kolom grid, ukuran ikon, bentuk ikon, label, dan icon pack format ADW.
 - Backup dan restore layout serta pengaturan (JSON via Storage Access Framework).
-- At a Glance: cuaca (Open-Meteo) dan agenda kalender berikutnya.
 - Tema gelap, terang, sistem, dan warna dinamis Material You.
 - GlassBerry (app kedua, module `:berry`): virtual phone portrait dengan layar virtual (VirtualDisplay + Presentation) dan keyboard QWERTY ala BlackBerry, lengkap dengan mini OS (Notes, Terminal, About) yang dikendalikan penuh dari keyboard.
 
