@@ -140,7 +140,7 @@ class MainActivity : Activity() {
         }.getOrNull() ?: return fallbackToDirectView()
         virtualDisplay = vd
 
-        val display: Display? = dm.getDisplay(vd.display.id) ?: vd.display
+        val display: Display? = dm.getDisplay(vd.display.displayId) ?: vd.display
         val pres = display?.let { d ->
             runCatching { BerryPresentation(this, d) }.getOrNull()
         } ?: run {

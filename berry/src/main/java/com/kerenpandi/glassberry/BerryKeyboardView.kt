@@ -47,10 +47,10 @@ class BerryKeyboardView(context: Context) : View(context) {
     )
 
     private val symbolRows: List<List<Key>> = listOf(
-        "1234567890".map { Key(it.toString(), Kind.CHAR, ch = it[0]) },
-        "@#_&-+()/".map { Key(it.toString(), Kind.CHAR, ch = it[0]) },
+        "1234567890".map { Key(it.toString(), Kind.CHAR, ch = it) },
+        "@#_&-+()/".map { Key(it.toString(), Kind.CHAR, ch = it) },
         listOf(Key("=\\<", Kind.SYM, 1.5f)) +
-            "*\"':;!?".map { Key(it.toString(), Kind.CHAR, ch = it[0]) } +
+            "*\"':;!?".map { Key(it.toString(), Kind.CHAR, ch = it) } +
             listOf(Key("⌫", Kind.BACKSPACE, 1.5f)),
         listOf(
             Key("⎋", Kind.ESCAPE, 1.3f),

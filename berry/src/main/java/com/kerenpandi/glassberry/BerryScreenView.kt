@@ -86,7 +86,7 @@ class BerryScreenView(context: Context) : View(context) {
 
     private fun drawHome(canvas: Canvas, os: BerryOS, w: Float, h: Float, barH: Float) {
         white.textSize = dp(64f)
-        white.typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.LIGHT)
+        white.typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
         val clock = clockFormat.format(Date())
         val clockW = white.measureText(clock)
         canvas.drawText(clock, (w - clockW) / 2, barH + dp(90f), white)
