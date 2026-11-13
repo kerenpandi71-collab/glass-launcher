@@ -62,6 +62,8 @@ class BerryController(private val app: Application) {
         private set
     var touchpadHidden by mutableStateOf(false)
         private set
+    var androidKeyboardEnabled by mutableStateOf(true)
+        private set
 
     val deviceDensityDpi: Int
         get() = app.resources.displayMetrics.densityDpi
@@ -613,9 +615,12 @@ class BerryController(private val app: Application) {
         newResScale: Float,
         hideKeyboard: Boolean,
         hideTouchpad: Boolean,
+        androidKbEnabled: Boolean,
     ) {
         keyboardHidden = hideKeyboard
         touchpadHidden = hideTouchpad
+        androidKeyboardEnabled = androidKbEnabled
+        setImeSuppressed(!androidKbEnabled)
         val resChanged = kotlin.math.abs(newResScale - resScale) > 0.001f
         dpiScale = newDpiScale.coerceIn(0.4f, 1.2f)
         resScale = newResScale.coerceIn(0.5f, 1f)
@@ -669,12 +674,13 @@ class BerryController(private val app: Application) {
     private val disabledImes = mutableListOf<String>()
 
     private fun setImeSuppressed(blocked: Boolean) {
-        if (blocked == imeSuppressed) return
-        imeSuppressed = blocked
+        val effective = blocked || !androidKeyboardEnabled
+        if (effective == imeSuppressed) return
+        imeSuppressed = effective
         val svc = service ?: return
         worker.execute {
             runCatching {
-                if (blocked) {
+                if (effective) {
                     val ids = svc.runShell("ime list -s")
                         .lines()
                         .map { it.trim() }

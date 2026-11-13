@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
@@ -36,6 +37,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -51,7 +53,11 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -68,6 +74,24 @@ import kotlinx.coroutines.delay
 
 @Composable
 fun BerryScreen(c: BerryController) {
+    val density = LocalDensity.current
+    val listState = rememberLazyListState()
+    var listTopY by remember { mutableFloatStateOf(0f) }
+    var screenSize by remember { mutableStateOf(android.util.Size(0, 0)) }
+    val rowHeightPx = with(density) { 52.dp.toPx() }
+
+    val pickerTap: () -> Unit = {
+        val (dw, dh) = c.displaySize
+        if (dw > 0 && dh > 0 && screenSize.width > 0) {
+            val cx = c.cursorX / dw * screenSize.width
+            val cy = c.cursorY / dh * screenSize.height
+            val index = listState.firstVisibleItemIndex +
+                ((cy - listTopY + listState.firstVisibleItemScrollOffset) / rowHeightPx).toInt()
+            c.filteredApps.getOrNull(index)?.let { c.launch(it) }
+        }
+    }
+    val pickerScroll: (Float) -> Unit = { dy -> listState.dispatchRawDelta(-dy * 2f) }
+
     Column(
         Modifier
             .fillMaxSize()
@@ -85,7 +109,8 @@ fun BerryScreen(c: BerryController) {
                     },
                 )
                 .background(Berry.ScreenOff)
-                .border(1.dp, Color(0x2EFFFFFF)),
+                .border(1.dp, Color(0x2EFFFFFF))
+                .onSizeChanged { screenSize = android.util.Size(it.width, it.height) },
         ) {
             BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 VirtualSurface(
@@ -98,7 +123,7 @@ fun BerryScreen(c: BerryController) {
             when {
                 c.shizukuState != ShizukuState.READY -> ShizukuPanel(c)
                 c.displayId < 0 -> LoadingPanel()
-                c.pickerOpen -> AppPicker(c)
+                c.pickerOpen -> AppPicker(c, listState) { listTopY = it }
             }
             c.message?.let { text ->
                 MessageBanner(text, Modifier.align(Alignment.BottomCenter)) { c.message = null }
@@ -113,12 +138,9 @@ fun BerryScreen(c: BerryController) {
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             SpeakerGrill()
+            if (!c.keyboardHidden) BerryKeyboard(c)
+            if (!c.touchpadHidden) Trackpad(c, Modifier.weight(1f), pickerTap, pickerScroll)
             NavStrip(c)
-            if (!c.keyboardHidden) {
-                Spacer(Modifier.height(10.dp))
-                BerryKeyboard(c)
-            }
-            if (!c.touchpadHidden) Trackpad(c, Modifier.weight(1f))
         }
     }
 
@@ -249,7 +271,11 @@ private fun PillButton(label: String, onPress: () -> Unit) {
 }
 
 @Composable
-private fun AppPicker(c: BerryController) {
+private fun AppPicker(
+    c: BerryController,
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    onListPositioned: (Float) -> Unit,
+) {
     Column(
         Modifier
             .fillMaxSize()
@@ -279,7 +305,12 @@ private fun AppPicker(c: BerryController) {
                 Text("Tidak ada hasil", color = Berry.InkDim, fontSize = 13.sp)
             }
         } else {
-            LazyColumn(Modifier.fillMaxSize()) {
+            LazyColumn(
+                Modifier
+                    .fillMaxSize()
+                    .onGloballyPositioned { onListPositioned(it.positionInParent().y) },
+                state = listState,
+            ) {
                 items(list, key = { it.component }) { app ->
                     AppRow(app) { c.launch(app) }
                 }
@@ -293,8 +324,9 @@ private fun AppRow(app: AppEntry, onPress: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
+            .height(52.dp)
             .clickable(onClick = onPress)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
@@ -405,7 +437,12 @@ private fun NavStrip(c: BerryController) {
 }
 
 @Composable
-private fun Trackpad(c: BerryController, modifier: Modifier = Modifier) {
+private fun Trackpad(
+    c: BerryController,
+    modifier: Modifier = Modifier,
+    onTap: () -> Unit = {},
+    onScrollY: (Float) -> Unit = {},
+) {
     val haptic = LocalHapticFeedback.current
     Box(
         modifier
@@ -433,11 +470,19 @@ private fun Trackpad(c: BerryController, modifier: Modifier = Modifier) {
                             }
                             pressed.firstOrNull()?.let { change ->
                                 val delta = change.positionChange()
-                                c.trackpadScroll(delta.x, delta.y)
+                                if (c.pickerOpen) {
+                                    onScrollY(delta.y)
+                                } else {
+                                    c.trackpadScroll(delta.x, delta.y)
+                                }
                                 change.consume()
                             }
                         } else {
                             pressed.firstOrNull()?.let { change ->
+                                if (c.pickerOpen) {
+                                    change.consume()
+                                    return@let
+                                }
                                 val delta = change.positionChange()
                                 moved += delta.getDistance()
                                 if (dragging) {
@@ -458,10 +503,9 @@ private fun Trackpad(c: BerryController, modifier: Modifier = Modifier) {
                                 c.trackpadDragEnd()
                             } else if (!twoFinger &&
                                 System.currentTimeMillis() - startTime < 260 &&
-                                moved < 12f &&
-                                !c.pickerOpen
+                                moved < 12f
                             ) {
-                                c.trackpadTap()
+                                if (c.pickerOpen) onTap() else c.trackpadTap()
                             }
                             break
                         }
@@ -525,6 +569,7 @@ private fun DisplaySettingsDialog(c: BerryController) {
     var res by remember(c.showDisplaySettings) { mutableStateOf(c.resScale) }
     var hideKb by remember(c.showDisplaySettings) { mutableStateOf(c.keyboardHidden) }
     var hidePad by remember(c.showDisplaySettings) { mutableStateOf(c.touchpadHidden) }
+    var kb by remember(c.showDisplaySettings) { mutableStateOf(c.androidKeyboardEnabled) }
     val (baseW, baseH) = c.surfaceSize
     Dialog(onDismissRequest = { c.showDisplaySettings = false }) {
         Column(
@@ -575,6 +620,7 @@ private fun DisplaySettingsDialog(c: BerryController) {
             Spacer(Modifier.height(8.dp))
             SettingToggle("Sembunyikan keyboard", hideKb) { hideKb = !hideKb }
             SettingToggle("Sembunyikan touchpad", hidePad) { hidePad = !hidePad }
+            SettingToggle("Keyboard Android", kb) { kb = !kb }
             Spacer(Modifier.height(4.dp))
             Text(
                 "Keyboard Android otomatis mati saat kamu mengetik dengan keyboard GlassBerry, " +
@@ -601,7 +647,7 @@ private fun DisplaySettingsDialog(c: BerryController) {
                         .clip(RoundedCornerShape(10.dp))
                         .background(Berry.Accent)
                         .clickable {
-                            c.applyDisplayConfig(dpi, res, hideKb, hidePad)
+                            c.applyDisplayConfig(dpi, res, hideKb, hidePad, kb)
                             c.showDisplaySettings = false
                         }
                         .padding(vertical = 12.dp),

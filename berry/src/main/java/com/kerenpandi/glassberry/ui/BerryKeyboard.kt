@@ -17,6 +17,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,6 +31,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kerenpandi.glassberry.BerryController
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 
 private const val SHIFT_OFF = 0
 private const val SHIFT_ONCE = 1
@@ -73,7 +78,7 @@ fun BerryKeyboard(controller: BerryController) {
                         Key(symbol, Modifier.weight(1f)) { typeAlt(symbol) }
                     }
                 }
-                Key("⌫", Modifier.weight(1.5f), special = true) { controller.sendBackspace() }
+                Key("⌫", Modifier.weight(1.5f), special = true, repeatable = true) { controller.sendBackspace() }
             }
             Row(
                 Modifier.fillMaxWidth(),
@@ -117,7 +122,7 @@ fun BerryKeyboard(controller: BerryController) {
                         Key(letter, Modifier.weight(1f)) { typeChar(letter[0]) }
                     }
                 }
-                Key("⌫", Modifier.weight(1.5f), special = true) { controller.sendBackspace() }
+                Key("⌫", Modifier.weight(1.5f), special = true, repeatable = true) { controller.sendBackspace() }
             }
             Row(
                 Modifier.fillMaxWidth(),
@@ -161,11 +166,14 @@ private fun Key(
     special: Boolean = false,
     active: Boolean = false,
     accent: Boolean = false,
+    repeatable: Boolean = false,
     onAlt: (() -> Unit)? = null,
     onPress: () -> Unit,
 ) {
     val haptic = LocalHapticFeedback.current
+    val scope = rememberCoroutineScope()
     var pressed by remember { mutableStateOf(false) }
+    var pressJob by remember { mutableStateOf<Job?>(null) }
     val scale by animateFloatAsState(if (pressed) 0.93f else 1f, label = "keyScale")
     val base = when {
         accent || active -> Berry.Accent
@@ -183,15 +191,27 @@ private fun Key(
             }
             .clip(RoundedCornerShape(9.dp))
             .background(bg)
-            .pointerInput(label) {
+            .pointerInput(label, repeatable) {
                 detectTapGestures(
                     onPress = {
                         pressed = true
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        if (repeatable) {
+                            onPress()
+                            pressJob = scope.launch {
+                                delay(350)
+                                while (isActive) {
+                                    onPress()
+                                    delay(60)
+                                }
+                            }
+                        }
                         tryAwaitRelease()
+                        pressJob?.cancel()
+                        pressJob = null
                         pressed = false
                     },
-                    onTap = { onPress() },
+                    onTap = { if (!repeatable) onPress() },
                     onLongPress = {
                         if (onAlt != null) {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
