@@ -13,9 +13,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -65,20 +67,15 @@ fun BerryScreen(c: BerryController) {
     Column(
         Modifier
             .fillMaxSize()
-            .background(Brush.verticalGradient(listOf(Berry.BodyTop, Berry.Body)))
-            .statusBarsPadding()
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+            .background(Berry.Bezel)
+            .statusBarsPadding(),
     ) {
-        SpeakerGrill()
-        Spacer(Modifier.height(10.dp))
         Box(
             Modifier
-                .weight(1f)
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .aspectRatio(1f)
                 .background(Berry.ScreenOff)
-                .border(1.dp, Color(0x2EFFFFFF), RoundedCornerShape(12.dp)),
+                .border(1.dp, Color(0x2EFFFFFF)),
         ) {
             VirtualSurface(c, Modifier.fillMaxSize())
             when {
@@ -92,12 +89,19 @@ fun BerryScreen(c: BerryController) {
             TopStrip(c, Modifier.align(Alignment.TopCenter))
             CursorOverlay(c, Modifier.fillMaxSize())
         }
-        Spacer(Modifier.height(10.dp))
-        NavStrip(c)
-        Spacer(Modifier.height(6.dp))
-        BerryKeyboard(c)
-        Spacer(Modifier.height(6.dp))
-        Trackpad(c)
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .background(Brush.verticalGradient(listOf(Berry.BodyTop, Berry.Body)))
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            SpeakerGrill()
+            NavStrip(c)
+            BerryKeyboard(c)
+            Trackpad(c, Modifier.weight(1f))
+        }
     }
 
     if (c.showDisplaySettings) {
@@ -385,12 +389,12 @@ private fun NavStrip(c: BerryController) {
 }
 
 @Composable
-private fun Trackpad(c: BerryController) {
+private fun Trackpad(c: BerryController, modifier: Modifier = Modifier) {
     val haptic = LocalHapticFeedback.current
     Box(
-        Modifier
+        modifier
             .fillMaxWidth()
-            .height(78.dp)
+            .heightIn(min = 72.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(Berry.Key.copy(alpha = 0.6f))
             .border(1.dp, Color(0x24FFFFFF), RoundedCornerShape(12.dp))
