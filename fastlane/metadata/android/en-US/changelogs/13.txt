@@ -1,0 +1,1 @@
+Pilihan bentuk ikon disederhanakan: hanya Lingkaran dan Squircle.

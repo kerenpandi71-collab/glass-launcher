@@ -15,7 +15,7 @@ Launcher Android bertema liquid glass ala iOS, dibangun dengan Kotlin + Jetpack 
 - Badge jumlah notifikasi per aplikasi melalui NotificationListenerService.
 - Gestur: geser atas membuka pencarian, geser bawah membuka panel notifikasi, double-tap mengunci layar (via device admin).
 - Sembunyikan aplikasi dari home, drawer, dan pencarian.
-- Kustomisasi: jumlah kolom grid, ukuran ikon, bentuk ikon (termasuk gaya iPhone: squircle superellipse dengan latar putih), label, dan icon pack format ADW.
+- Kustomisasi: jumlah kolom grid, ukuran ikon, bentuk ikon, label, dan icon pack format ADW.
 - Backup dan restore layout serta pengaturan (JSON via Storage Access Framework).
 - At a Glance: cuaca (Open-Meteo) dan agenda kalender berikutnya.
 - Tema gelap, terang, sistem, dan warna dinamis Material You.

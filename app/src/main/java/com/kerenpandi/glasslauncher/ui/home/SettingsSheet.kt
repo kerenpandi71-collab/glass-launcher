@@ -194,10 +194,7 @@ fun SettingsSheet(
                     ChipRow(
                         options = listOf(
                             IconShapes.CIRCLE to "Lingkaran",
-                            IconShapes.SQUIRCLE to "Squircle",
-                            IconShapes.ROUNDED to "Membulat",
-                            IconShapes.SQUARE to "Kotak",
-                            IconShapes.IOS to "iPhone"
+                            IconShapes.SQUIRCLE to "Squircle"
                         ),
                         selected = settings.iconShape,
                         onSelect = { settings.updateIconShape(it) }
