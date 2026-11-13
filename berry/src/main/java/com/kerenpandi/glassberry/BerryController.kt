@@ -62,6 +62,8 @@ class BerryController(private val app: Application) {
         private set
     var touchpadHidden by mutableStateOf(false)
         private set
+    var blockIme by mutableStateOf(false)
+        private set
 
     val deviceDensityDpi: Int
         get() = app.resources.displayMetrics.densityDpi
@@ -102,6 +104,13 @@ class BerryController(private val app: Application) {
         private set
     var cursorY by mutableStateOf(0f)
         private set
+    private var padDown = false
+    private var padDownTime = 0L
+    private val hoverLock = Any()
+    private var hoverQueued = false
+    private var hoverDirty = false
+    private var pendingHoverX = 0f
+    private var pendingHoverY = 0f
     private data class ActiveTouch(val id: Int, var x: Float, var y: Float)
     private val touchLock = Any()
     private val activeTouches = LinkedHashMap<String, ActiveTouch>()
@@ -297,6 +306,7 @@ class BerryController(private val app: Application) {
                         putInt("width", w)
                         putInt("height", h)
                         putInt("dpi", dpi)
+                        putBoolean("blockIme", blockIme)
                     })
                 }
             }
@@ -429,7 +439,59 @@ class BerryController(private val app: Application) {
         }
         cursorX = (cursorX + dx * PAD_SENSITIVITY).coerceIn(0f, displayW.toFloat())
         cursorY = (cursorY + dy * PAD_SENSITIVITY).coerceIn(0f, displayH.toFloat())
-        injectHoverMotion(svc, id, cursorX, cursorY)
+        synchronized(hoverLock) {
+            pendingHoverX = cursorX
+            pendingHoverY = cursorY
+            hoverDirty = true
+            if (hoverQueued) return
+            hoverQueued = true
+        }
+        inputWorker.execute {
+            try {
+                while (true) {
+                    val point = synchronized(hoverLock) {
+                        if (!hoverDirty) null
+                        else {
+                            hoverDirty = false
+                            pendingHoverX to pendingHoverY
+                        }
+                    } ?: break
+                    injectHoverMotion(svc, id, point.first, point.second)
+                }
+            } finally {
+                synchronized(hoverLock) { hoverQueued = false }
+            }
+        }
+    }
+
+    fun trackpadDragStart() {
+        val svc = service ?: return
+        val id = displayId
+        if (id < 0 || padDown || displayW <= 0 || displayH <= 0) return
+        if (cursorX <= 0f && cursorY <= 0f) {
+            cursorX = displayW / 2f
+            cursorY = displayH / 2f
+        }
+        padDown = true
+        padDownTime = SystemClock.uptimeMillis()
+        injectTouchMotion(svc, id, MotionEvent.ACTION_DOWN, cursorX, cursorY, padDownTime, padDownTime)
+    }
+
+    fun trackpadDragMove(dx: Float, dy: Float) {
+        val svc = service ?: return
+        val id = displayId
+        if (id < 0 || !padDown || displayW <= 0 || displayH <= 0) return
+        cursorX = (cursorX + dx * PAD_SENSITIVITY).coerceIn(0f, displayW.toFloat())
+        cursorY = (cursorY + dy * PAD_SENSITIVITY).coerceIn(0f, displayH.toFloat())
+        injectTouchMotion(svc, id, MotionEvent.ACTION_MOVE, cursorX, cursorY, padDownTime, SystemClock.uptimeMillis())
+    }
+
+    fun trackpadDragEnd() {
+        val svc = service ?: return
+        val id = displayId
+        if (id < 0 || !padDown) return
+        padDown = false
+        injectTouchMotion(svc, id, MotionEvent.ACTION_UP, cursorX, cursorY, padDownTime, SystemClock.uptimeMillis())
     }
 
     fun trackpadScroll(dx: Float, dy: Float) {
@@ -549,15 +611,33 @@ class BerryController(private val app: Application) {
         newResScale: Float,
         hideKeyboard: Boolean,
         hideTouchpad: Boolean,
+        newBlockIme: Boolean,
     ) {
         keyboardHidden = hideKeyboard
         touchpadHidden = hideTouchpad
         val resChanged = kotlin.math.abs(newResScale - resScale) > 0.001f
+        val imeChanged = newBlockIme != blockIme
         dpiScale = newDpiScale.coerceIn(0.4f, 1.2f)
         resScale = newResScale.coerceIn(0.5f, 1f)
+        blockIme = newBlockIme
         val svc = service ?: return
         val id = displayId
         if (id < 0 || displayW <= 0 || displayH <= 0) return
+        if (imeChanged) {
+            busy = true
+            worker.execute {
+                runCatching { svc.releaseDisplay() }
+                main.post {
+                    busy = false
+                    displayId = -1
+                    displayW = 0
+                    displayH = 0
+                    message = if (blockIme) "Keyboard Android dimatikan, layar disiapkan ulang…" else "Keyboard Android diaktifkan, layar disiapkan ulang…"
+                    ensureDisplay()
+                }
+            }
+            return
+        }
         if (resChanged) {
             message = "Resolusi diubah ke ${(surfaceW * resScale).toInt()}x${(surfaceH * resScale).toInt()}"
             return
@@ -584,7 +664,17 @@ class BerryController(private val app: Application) {
         val svc = service ?: return
         worker.execute {
             runCatching {
-                svc.runShell("settings put secure swipe_up_to_switch_apps_enabled ${if (enabled) 1 else 0}")
+                if (enabled) {
+                    svc.runShell("cmd overlay enable com.android.internal.systemui.navbar.gesture")
+                    svc.runShell("cmd overlay disable com.android.internal.systemui.navbar.threebutton")
+                    svc.runShell("settings put secure swipe_up_to_switch_apps_enabled 1")
+                    svc.runShell("settings put secure navigation_gesture_on 1")
+                } else {
+                    svc.runShell("cmd overlay disable com.android.internal.systemui.navbar.gesture")
+                    svc.runShell("cmd overlay enable com.android.internal.systemui.navbar.threebutton")
+                    svc.runShell("settings put secure swipe_up_to_switch_apps_enabled 0")
+                    svc.runShell("settings put secure navigation_gesture_on 0")
+                }
             }
         }
     }

@@ -44,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -395,6 +396,7 @@ private fun NavStrip(c: BerryController) {
     ) {
         NavKey("MENU", Modifier.weight(1f), Berry.Key) { c.sendMenu() }
         NavKey("HOME", Modifier.weight(1f), Berry.Key) { c.goHome() }
+        NavKey("MENU 2", Modifier.weight(1f), Berry.KeySpecial) { c.showDisplaySettings = true }
         NavKey("BACK", Modifier.weight(1f), Berry.Accent) { c.sendBackKey() }
     }
 }
@@ -415,13 +417,17 @@ private fun Trackpad(c: BerryController, modifier: Modifier = Modifier) {
                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     val startTime = System.currentTimeMillis()
                     var twoFinger = false
-                    var settingsShown = false
+                    var dragging = false
                     var moved = 0f
                     while (true) {
                         val event = awaitPointerEvent()
                         val pressed = event.changes.filter { it.pressed }
                         if (pressed.size >= 2) twoFinger = true
                         if (twoFinger) {
+                            if (dragging) {
+                                c.trackpadDragEnd()
+                                dragging = false
+                            }
                             pressed.firstOrNull()?.let { change ->
                                 val delta = change.positionChange()
                                 c.trackpadScroll(delta.x, delta.y)
@@ -431,24 +437,27 @@ private fun Trackpad(c: BerryController, modifier: Modifier = Modifier) {
                             pressed.firstOrNull()?.let { change ->
                                 val delta = change.positionChange()
                                 moved += delta.getDistance()
-                                c.trackpadHover(delta.x, delta.y)
-                                change.consume()
-                                if (!settingsShown &&
-                                    System.currentTimeMillis() - startTime > 550 &&
-                                    moved < 12f
-                                ) {
-                                    settingsShown = true
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    c.showDisplaySettings = true
+                                if (dragging) {
+                                    c.trackpadDragMove(delta.x, delta.y)
+                                } else {
+                                    c.trackpadHover(delta.x, delta.y)
+                                    if (System.currentTimeMillis() - startTime > 400 && moved < 12f) {
+                                        dragging = true
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        c.trackpadDragStart()
+                                    }
                                 }
+                                change.consume()
                             }
                         }
                         if (event.changes.none { it.pressed }) {
-                            if (!twoFinger && !settingsShown &&
+                            if (dragging) {
+                                c.trackpadDragEnd()
+                            } else if (!twoFinger &&
                                 System.currentTimeMillis() - startTime < 260 &&
                                 moved < 12f
                             ) {
-                                c.trackpadTap()
+                                if (c.pickerOpen) c.sendEnter() else c.trackpadTap()
                             }
                             break
                         }
@@ -457,6 +466,20 @@ private fun Trackpad(c: BerryController, modifier: Modifier = Modifier) {
             },
         contentAlignment = Alignment.Center,
     ) {
+        Canvas(Modifier.fillMaxSize()) {
+            val lineColor = Berry.InkDim.copy(alpha = 0.10f)
+            val step = 18.dp.toPx()
+            var x = step
+            while (x < size.width) {
+                drawLine(lineColor, Offset(x, 0f), Offset(x, size.height), strokeWidth = 1f)
+                x += step
+            }
+            var y = step
+            while (y < size.height) {
+                drawLine(lineColor, Offset(0f, y), Offset(size.width, y), strokeWidth = 1f)
+                y += step
+            }
+        }
         Text(
             "TOUCHPAD",
             color = Berry.InkDim.copy(alpha = 0.45f),
@@ -468,7 +491,7 @@ private fun Trackpad(c: BerryController, modifier: Modifier = Modifier) {
 
 @Composable
 private fun CursorOverlay(c: BerryController, modifier: Modifier) {
-    if (c.displayId < 0 || c.pickerOpen) return
+    if (c.displayId < 0) return
     Canvas(modifier) {
         val (dw, dh) = c.displaySize
         if (dw <= 0 || dh <= 0) return@Canvas
@@ -498,6 +521,7 @@ private fun DisplaySettingsDialog(c: BerryController) {
     var res by remember(c.showDisplaySettings) { mutableStateOf(c.resScale) }
     var hideKb by remember(c.showDisplaySettings) { mutableStateOf(c.keyboardHidden) }
     var hidePad by remember(c.showDisplaySettings) { mutableStateOf(c.touchpadHidden) }
+    var blockIme by remember(c.showDisplaySettings) { mutableStateOf(c.blockIme) }
     val (baseW, baseH) = c.surfaceSize
     Dialog(onDismissRequest = { c.showDisplaySettings = false }) {
         Column(
@@ -548,6 +572,7 @@ private fun DisplaySettingsDialog(c: BerryController) {
             Spacer(Modifier.height(8.dp))
             SettingToggle("Sembunyikan keyboard", hideKb) { hideKb = !hideKb }
             SettingToggle("Sembunyikan touchpad", hidePad) { hidePad = !hidePad }
+            SettingToggle("Cegah keyboard Android muncul", blockIme) { blockIme = !blockIme }
             Spacer(Modifier.height(16.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Box(
@@ -567,7 +592,7 @@ private fun DisplaySettingsDialog(c: BerryController) {
                         .clip(RoundedCornerShape(10.dp))
                         .background(Berry.Accent)
                         .clickable {
-                            c.applyDisplayConfig(dpi, res, hideKb, hidePad)
+                            c.applyDisplayConfig(dpi, res, hideKb, hidePad, blockIme)
                             c.showDisplaySettings = false
                         }
                         .padding(vertical = 12.dp),

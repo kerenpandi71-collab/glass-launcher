@@ -67,19 +67,20 @@ class BerryUserService : IBerryService.Stub() {
     private fun unwrap(t: Throwable): Throwable =
         (t as? InvocationTargetException)?.targetException ?: t
 
-    private fun requestLocalIme(builder: VirtualDisplayConfig.Builder) {
+    private fun applyImePolicy(builder: VirtualDisplayConfig.Builder, blockIme: Boolean) {
         runCatching {
             val policy = runCatching {
-                VirtualDisplayConfig::class.java.getDeclaredField("IME_POLICY_LOCAL").apply {
-                    isAccessible = true
-                }.getInt(null)
-            }.getOrDefault(1)
+                VirtualDisplayConfig::class.java
+                    .getDeclaredField(if (blockIme) "IME_POLICY_HIDE" else "IME_POLICY_LOCAL")
+                    .apply { isAccessible = true }
+                    .getInt(null)
+            }.getOrDefault(if (blockIme) 2 else 1)
             val method = builder.javaClass.methods.firstOrNull {
                 it.name == "setImePolicy" && it.parameterTypes.size == 1 &&
                     it.parameterTypes[0] == Int::class.javaPrimitiveType
             } ?: return
             method.invoke(builder, policy)
-        }.onFailure { Log.w("GlassBerry", "Local IME policy is not available on this Android build", unwrap(it)) }
+        }.onFailure { Log.w("GlassBerry", "IME policy is not available on this Android build", unwrap(it)) }
     }
 
     // ---- display ------------------------------------------------------------
@@ -93,6 +94,7 @@ class BerryUserService : IBerryService.Stub() {
                 val width = args.getInt("width")
                 val height = args.getInt("height")
                 val dpi = args.getInt("dpi")
+                val blockIme = args.getBoolean("blockIme")
                 releaseLocked()
 
                 var lastError: Throwable? = null
@@ -100,7 +102,7 @@ class BerryUserService : IBerryService.Stub() {
                     try {
                         val builder = VirtualDisplayConfig.Builder("GlassBerry", width, height, dpi)
                             .setFlags(flags)
-                        requestLocalIme(builder)
+                        applyImePolicy(builder, blockIme)
                         if (surface != null) builder.setSurface(surface)
                         val cb = asInterface(DISPLAY_CALLBACK, Binder())
                         val id = createMethod.invoke(
