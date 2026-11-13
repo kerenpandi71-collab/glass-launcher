@@ -65,6 +65,9 @@ class BerryController(private val app: Application) {
     val surfaceSize: Pair<Int, Int>
         get() = surfaceW to surfaceH
 
+    val displaySize: Pair<Int, Int>
+        get() = displayW to displayH
+
     val filteredApps: List<AppEntry>
         get() = if (search.isBlank()) apps
         else apps.filter {
@@ -91,8 +94,10 @@ class BerryController(private val app: Application) {
     private var displayH = 0
 
     private val keyDownTimes = HashMap<Int, Long>()
-    private var cursorX = 0f
-    private var cursorY = 0f
+    var cursorX by mutableStateOf(0f)
+        private set
+    var cursorY by mutableStateOf(0f)
+        private set
     private var padDown = false
     private var padDownTime = 0L
     private data class ActiveTouch(val id: Int, var x: Float, var y: Float)
@@ -408,6 +413,46 @@ class BerryController(private val app: Application) {
     }
 
     // ---- trackpad ------------------------------------------------------------
+
+    fun trackpadHover(dx: Float, dy: Float) {
+        val svc = service ?: return
+        val id = displayId
+        if (id < 0 || padDown || displayW <= 0 || displayH <= 0) return
+        if (cursorX <= 0f && cursorY <= 0f) {
+            cursorX = displayW / 2f
+            cursorY = displayH / 2f
+        }
+        cursorX = (cursorX + dx * PAD_SENSITIVITY).coerceIn(0f, displayW.toFloat())
+        cursorY = (cursorY + dy * PAD_SENSITIVITY).coerceIn(0f, displayH.toFloat())
+        injectHoverMotion(svc, id, cursorX, cursorY)
+    }
+
+    private fun injectHoverMotion(svc: IBerryService, id: Int, x: Float, y: Float) {
+        val now = SystemClock.uptimeMillis()
+        val properties = arrayOf(
+            MotionEvent.PointerProperties().apply {
+                this.id = 0
+                toolType = MotionEvent.TOOL_TYPE_MOUSE
+            },
+        )
+        val coordinates = arrayOf(
+            MotionEvent.PointerCoords().apply {
+                this.x = x
+                this.y = y
+                pressure = 1f
+                size = 1f
+            },
+        )
+        val event = MotionEvent.obtain(
+            now, now, MotionEvent.ACTION_HOVER_MOVE, 1, properties, coordinates,
+            0, 0, 1f, 1f, 0, 0, InputDevice.SOURCE_MOUSE, 0,
+        )
+        try {
+            inject(svc, event, id)
+        } finally {
+            event.recycle()
+        }
+    }
 
     fun trackpadStart() {
         val svc = service ?: return

@@ -1,12 +1,13 @@
 package com.kerenpandi.glassberry.ui
 
 import android.view.SurfaceView
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,6 +39,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -86,11 +89,14 @@ fun BerryScreen(c: BerryController) {
                 MessageBanner(text, Modifier.align(Alignment.BottomCenter)) { c.message = null }
             }
             TopStrip(c, Modifier.align(Alignment.TopCenter))
+            CursorOverlay(c, Modifier.fillMaxSize())
         }
         Spacer(Modifier.height(10.dp))
         NavStrip(c)
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(6.dp))
         BerryKeyboard(c)
+        Spacer(Modifier.height(6.dp))
+        Trackpad(c)
     }
 
     if (c.showDisplaySettings) {
@@ -372,53 +378,108 @@ private fun NavStrip(c: BerryController) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         NavKey("MENU", Modifier.weight(1f), Berry.Key) { c.sendMenu() }
-        Trackball(c)
         NavKey("HOME", Modifier.weight(1f), Berry.Key) { c.sendHomeKey() }
         NavKey("BACK", Modifier.weight(1f), Berry.Accent) { c.sendBackKey() }
     }
 }
 
 @Composable
-private fun Trackball(c: BerryController) {
+private fun Trackpad(c: BerryController) {
     val haptic = LocalHapticFeedback.current
     Box(
         Modifier
-            .size(54.dp)
-            .clip(CircleShape)
-            .background(Berry.KeySpecial)
-            .border(1.dp, Color(0x33FFFFFF), CircleShape)
+            .fillMaxWidth()
+            .height(78.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(Berry.Key.copy(alpha = 0.6f))
+            .border(1.dp, Color(0x24FFFFFF), RoundedCornerShape(12.dp))
             .pointerInput(Unit) {
-                detectDragGestures(
-                    onDragStart = { c.trackpadStart() },
-                    onDrag = { change, amount ->
-                        change.consume()
-                        c.trackpadMove(amount.x, amount.y)
-                    },
-                    onDragEnd = { c.trackpadEnd() },
-                    onDragCancel = { c.trackpadEnd() },
-                )
-            }
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onPress = {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        tryAwaitRelease()
-                    },
-                    onTap = { c.trackpadTap() },
-                    onLongPress = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        c.showDisplaySettings = true
-                    },
-                )
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    val startTime = System.currentTimeMillis()
+                    var twoFinger = false
+                    var dragging = false
+                    var settingsShown = false
+                    var moved = 0f
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val pressed = event.changes.filter { it.pressed }
+                        if (pressed.size >= 2) twoFinger = true
+                        if (twoFinger) {
+                            if (!dragging) {
+                                c.trackpadStart()
+                                dragging = true
+                            }
+                            pressed.lastOrNull()?.let { change ->
+                                val delta = change.positionChange()
+                                c.trackpadMove(delta.x, delta.y)
+                                change.consume()
+                            }
+                        } else {
+                            pressed.firstOrNull()?.let { change ->
+                                val delta = change.positionChange()
+                                moved += delta.getDistance()
+                                c.trackpadHover(delta.x, delta.y)
+                                change.consume()
+                                if (!settingsShown &&
+                                    System.currentTimeMillis() - startTime > 550 &&
+                                    moved < 12f
+                                ) {
+                                    settingsShown = true
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    c.showDisplaySettings = true
+                                }
+                            }
+                        }
+                        if (event.changes.none { it.pressed }) {
+                            if (dragging) {
+                                c.trackpadEnd()
+                            } else if (!twoFinger && !settingsShown &&
+                                System.currentTimeMillis() - startTime < 260 &&
+                                moved < 12f
+                            ) {
+                                c.trackpadTap()
+                            }
+                            break
+                        }
+                    }
+                }
             },
         contentAlignment = Alignment.Center,
     ) {
-        Box(
-            Modifier
-                .size(22.dp)
-                .clip(CircleShape)
-                .background(Berry.InkDim.copy(alpha = 0.35f)),
+        Text(
+            "TOUCHPAD",
+            color = Berry.InkDim.copy(alpha = 0.45f),
+            fontSize = 10.sp,
+            letterSpacing = 2.sp,
         )
+    }
+}
+
+@Composable
+private fun CursorOverlay(c: BerryController, modifier: Modifier) {
+    if (c.displayId < 0 || c.pickerOpen) return
+    Canvas(modifier) {
+        val (dw, dh) = c.displaySize
+        if (dw <= 0 || dh <= 0) return@Canvas
+        val scaleX = size.width / dw
+        val scaleY = size.height / dh
+        val x = (c.cursorX * scaleX).coerceIn(0f, size.width)
+        val y = (c.cursorY * scaleY).coerceIn(0f, size.height)
+        val s = 1.15f
+        val arrow = Path().apply {
+            moveTo(x, y)
+            lineTo(x + 2.2f * s, y + 15.5f * s)
+            lineTo(x + 5.6f * s, y + 12.2f * s)
+            lineTo(x + 8.0f * s, y + 17.6f * s)
+            lineTo(x + 10.4f * s, y + 16.5f * s)
+            lineTo(x + 8.1f * s, y + 11.0f * s)
+            lineTo(x + 12.2f * s, y + 11.0f * s)
+            close()
+        }
+        drawPath(arrow, color = Color.Black.copy(alpha = 0.75f), style = Stroke(width = 2.5f))
+        drawPath(arrow, color = Color.White)
     }
 }
 
