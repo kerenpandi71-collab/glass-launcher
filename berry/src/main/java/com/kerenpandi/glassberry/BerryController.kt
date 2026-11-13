@@ -53,6 +53,17 @@ class BerryController(private val app: Application) {
         private set
     var apps by mutableStateOf<List<AppEntry>>(emptyList())
         private set
+    var showDisplaySettings by mutableStateOf(false)
+    var dpiScale by mutableStateOf(DEFAULT_DPI_SCALE)
+        private set
+    var resScale by mutableStateOf(1f)
+        private set
+
+    val deviceDensityDpi: Int
+        get() = app.resources.displayMetrics.densityDpi
+
+    val surfaceSize: Pair<Int, Int>
+        get() = surfaceW to surfaceH
 
     val filteredApps: List<AppEntry>
         get() = if (search.isBlank()) apps
@@ -80,6 +91,10 @@ class BerryController(private val app: Application) {
     private var displayH = 0
 
     private val keyDownTimes = HashMap<Int, Long>()
+    private var cursorX = 0f
+    private var cursorY = 0f
+    private var padDown = false
+    private var padDownTime = 0L
     private data class ActiveTouch(val id: Int, var x: Float, var y: Float)
     private val touchLock = Any()
     private val activeTouches = LinkedHashMap<String, ActiveTouch>()
@@ -260,7 +275,7 @@ class BerryController(private val app: Application) {
         }
         val w = surfaceW and 1.inv()
         val h = surfaceH and 1.inv()
-        val dpi = (app.resources.displayMetrics.densityDpi * DPI_SCALE).toInt().coerceAtLeast(120)
+        val dpi = (app.resources.displayMetrics.densityDpi * dpiScale).toInt().coerceIn(120, 480)
         val existing = displayId
         busy = true
         worker.execute {
@@ -316,6 +331,7 @@ class BerryController(private val app: Application) {
         currentApp = null
         pickerOpen = true
         busy = false
+        padDown = false
         keyDownTimes.clear()
 
         runCatching {
@@ -386,6 +402,111 @@ class BerryController(private val app: Application) {
                         message = "${entry.label} sudah terbuka di layar utama. Tutup dulu dari menu aplikasi terbaru, lalu buka lagi di sini."
                     out.contains("Error", true) || out.contains("Exception", true) ->
                         message = "Gagal membuka ${entry.label}: ${out.trim().take(200)}"
+                }
+            }
+        }
+    }
+
+    // ---- trackpad ------------------------------------------------------------
+
+    fun trackpadStart() {
+        val svc = service ?: return
+        val id = displayId
+        if (id < 0 || padDown || displayW <= 0 || displayH <= 0) return
+        if (cursorX <= 0f && cursorY <= 0f) {
+            cursorX = displayW / 2f
+            cursorY = displayH / 2f
+        }
+        padDown = true
+        padDownTime = SystemClock.uptimeMillis()
+        injectTouchMotion(svc, id, MotionEvent.ACTION_DOWN, cursorX, cursorY, padDownTime, padDownTime)
+    }
+
+    fun trackpadMove(dx: Float, dy: Float) {
+        val svc = service ?: return
+        val id = displayId
+        if (id < 0 || !padDown || displayW <= 0 || displayH <= 0) return
+        cursorX = (cursorX + dx * PAD_SENSITIVITY).coerceIn(0f, displayW.toFloat())
+        cursorY = (cursorY + dy * PAD_SENSITIVITY).coerceIn(0f, displayH.toFloat())
+        injectTouchMotion(svc, id, MotionEvent.ACTION_MOVE, cursorX, cursorY, padDownTime, SystemClock.uptimeMillis())
+    }
+
+    fun trackpadEnd() {
+        val svc = service ?: return
+        val id = displayId
+        if (id < 0 || !padDown) return
+        padDown = false
+        injectTouchMotion(svc, id, MotionEvent.ACTION_UP, cursorX, cursorY, padDownTime, SystemClock.uptimeMillis())
+    }
+
+    fun trackpadTap() {
+        val svc = service ?: return
+        val id = displayId
+        if (id < 0 || padDown || displayW <= 0 || displayH <= 0) return
+        if (cursorX <= 0f && cursorY <= 0f) {
+            cursorX = displayW / 2f
+            cursorY = displayH / 2f
+        }
+        val downTime = SystemClock.uptimeMillis()
+        injectTouchMotion(svc, id, MotionEvent.ACTION_DOWN, cursorX, cursorY, downTime, downTime)
+        injectTouchMotion(svc, id, MotionEvent.ACTION_UP, cursorX, cursorY, downTime, downTime + 60)
+    }
+
+    private fun injectTouchMotion(
+        svc: IBerryService,
+        id: Int,
+        action: Int,
+        x: Float,
+        y: Float,
+        downTime: Long,
+        eventTime: Long,
+    ) {
+        val properties = arrayOf(
+            MotionEvent.PointerProperties().apply {
+                this.id = 0
+                toolType = MotionEvent.TOOL_TYPE_FINGER
+            },
+        )
+        val coordinates = arrayOf(
+            MotionEvent.PointerCoords().apply {
+                this.x = x
+                this.y = y
+                pressure = 1f
+                size = 1f
+            },
+        )
+        val event = MotionEvent.obtain(
+            downTime, eventTime, action, 1, properties, coordinates,
+            0, 0, 1f, 1f, 0, 0, InputDevice.SOURCE_TOUCHSCREEN, 0,
+        )
+        try {
+            inject(svc, event, id)
+        } finally {
+            event.recycle()
+        }
+    }
+
+    // ---- display settings ----------------------------------------------------
+
+    fun applyDisplayConfig(newDpiScale: Float, newResScale: Float) {
+        dpiScale = newDpiScale.coerceIn(0.4f, 1.2f)
+        resScale = newResScale.coerceIn(0.5f, 1f)
+        val svc = service ?: return
+        val id = displayId
+        if (id < 0 || surfaceW <= 0 || surfaceH <= 0) return
+        val w = (surfaceW * resScale).toInt() and 1.inv()
+        val h = (surfaceH * resScale).toInt() and 1.inv()
+        val dpi = (app.resources.displayMetrics.densityDpi * dpiScale).toInt().coerceIn(120, 480)
+        if (w <= 0 || h <= 0) return
+        worker.execute {
+            val out = runCatching { svc.resizeDisplay(w, h, dpi) }.getOrElse { "Error: ${it.message}" }
+            main.post {
+                if (out.contains("Error", true) || out.contains("Exception", true)) {
+                    message = "Gagal mengubah tampilan: ${out.trim().take(150)}"
+                } else {
+                    displayW = w
+                    displayH = h
+                    message = "Tampilan: ${w}x${h} @ ${dpi}dpi"
                 }
             }
         }
@@ -609,6 +730,7 @@ class BerryController(private val app: Application) {
     companion object {
         const val SHIZUKU_PACKAGE = "moe.shizuku.privileged.api"
         private const val REQUEST_CODE = 7
-        private const val DPI_SCALE = 0.75f
+        private const val DEFAULT_DPI_SCALE = 0.75f
+        private const val PAD_SENSITIVITY = 1.6f
     }
 }

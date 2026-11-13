@@ -18,7 +18,7 @@ Launcher Android bertema liquid glass ala iOS, dibangun dengan Kotlin + Jetpack 
 - Kustomisasi: jumlah kolom grid, ukuran ikon, bentuk ikon, label, dan icon pack format ADW.
 - Backup dan restore layout serta pengaturan (JSON via Storage Access Framework).
 - Tema gelap, terang, sistem, dan warna dinamis Material You.
-- GlassBerry v2.0 (app kedua, module `:berry`): HP BlackBerry virtual — layar portrait di atas, keyboard QWERTY fisik-style di bawah, lengkap dengan tombol MENU / HOME / BACK.
+- GlassBerry v2.2 (app kedua, module `:berry`): HP BlackBerry virtual — layar portrait di atas, keyboard QWERTY fisik-style di bawah, trackball di tengah tombol MENU / HOME / BACK (geser = gerakkan kursor, tap = klik, tekan lama = atur DPI dan resolusi layar virtual).
 - GlassBerry + Shizuku: arsitektur ala [Saku Deck](https://github.com/kerenpandi71-collab/saku-deck) (terinspirasi [Dextop by NarYuki](https://github.com/NarYuki/Dextop)) — Shizuku UserService membuat VirtualDisplay sungguhan (API 33+), aplikasi Android asli di-launch ke layar itu (`am start --display`), sentuhan di-forward langsung (multi-pointer), dan keyboard QWERTY mengetik ke aplikasi via injeksi KeyEvent.
 
 ## Performa
