@@ -1,0 +1,276 @@
+package com.kerenpandi.glassberry.service
+
+import android.hardware.display.VirtualDisplayConfig
+import android.os.Binder
+import android.os.Bundle
+import android.os.IBinder
+import android.os.Process
+import android.os.SystemClock
+import android.util.Log
+import android.view.InputEvent
+import android.view.Surface
+import com.kerenpandi.glassberry.IBerryService
+import org.lsposed.hiddenapibypass.HiddenApiBypass
+import java.lang.reflect.InvocationTargetException
+import java.lang.reflect.Method
+import kotlin.system.exitProcess
+
+/**
+ * Runs in a separate process started by Shizuku with shell (or root) identity.
+ * It owns the virtual display, launches apps on it and injects input into it.
+ * Architecture adapted from Saku Deck (same author).
+ */
+class BerryUserService : IBerryService.Stub() {
+
+    private val lock = Any()
+    private var callback: Any? = null
+    private var displayId = -1
+    private var lastInputError = "Belum ada event input yang diuji."
+    private var lastInputLogAt = 0L
+
+    init {
+        runCatching { HiddenApiBypass.addHiddenApiExemptions("") }
+    }
+
+    // ---- reflection helpers -------------------------------------------------
+
+    private fun systemService(name: String): IBinder =
+        Class.forName("android.os.ServiceManager")
+            .getMethod("getService", String::class.java)
+            .invoke(null, name) as IBinder
+
+    private fun asInterface(iface: String, binder: IBinder): Any =
+        Class.forName("$iface\$Stub")
+            .getMethod("asInterface", IBinder::class.java)
+            .invoke(null, binder)!!
+
+    private fun ifaceMethod(iface: String, name: String, argc: Int): Method =
+        Class.forName(iface).methods.first { it.name == name && it.parameterTypes.size == argc }
+
+    private val displayManager: Any by lazy {
+        asInterface(DISPLAY_MANAGER, systemService("display"))
+    }
+    private val inputManager: Any by lazy {
+        asInterface(INPUT_MANAGER, systemService("input"))
+    }
+    private val createMethod by lazy { ifaceMethod(DISPLAY_MANAGER, "createVirtualDisplay", 4) }
+    private val setSurfaceMethod by lazy { ifaceMethod(DISPLAY_MANAGER, "setVirtualDisplaySurface", 2) }
+    private val resizeMethod by lazy { ifaceMethod(DISPLAY_MANAGER, "resizeVirtualDisplay", 4) }
+    private val releaseMethod by lazy { ifaceMethod(DISPLAY_MANAGER, "releaseVirtualDisplay", 1) }
+    private val injectMethod by lazy { ifaceMethod(INPUT_MANAGER, "injectInputEvent", 2) }
+    private val setDisplayIdMethod by lazy {
+        InputEvent::class.java.getDeclaredMethod("setDisplayId", Int::class.javaPrimitiveType).apply {
+            isAccessible = true
+        }
+    }
+
+    private fun unwrap(t: Throwable): Throwable =
+        (t as? InvocationTargetException)?.targetException ?: t
+
+    private fun requestLocalIme(builder: VirtualDisplayConfig.Builder) {
+        runCatching {
+            val policy = runCatching {
+                VirtualDisplayConfig::class.java.getDeclaredField("IME_POLICY_LOCAL").apply {
+                    isAccessible = true
+                }.getInt(null)
+            }.getOrDefault(1)
+            val method = builder.javaClass.methods.firstOrNull {
+                it.name == "setImePolicy" && it.parameterTypes.size == 1 &&
+                    it.parameterTypes[0] == Int::class.javaPrimitiveType
+            } ?: return
+            method.invoke(builder, policy)
+        }.onFailure { Log.w("GlassBerry", "Local IME policy is not available on this Android build", unwrap(it)) }
+    }
+
+    // ---- display ------------------------------------------------------------
+
+    override fun createDisplay(args: Bundle): Bundle {
+        val out = Bundle()
+        synchronized(lock) {
+            try {
+                args.classLoader = Surface::class.java.classLoader
+                val surface = args.getParcelable("surface", Surface::class.java)
+                val width = args.getInt("width")
+                val height = args.getInt("height")
+                val dpi = args.getInt("dpi")
+                releaseLocked()
+
+                var lastError: Throwable? = null
+                for (flags in FLAG_SETS) {
+                    try {
+                        val builder = VirtualDisplayConfig.Builder("GlassBerry", width, height, dpi)
+                            .setFlags(flags)
+                        requestLocalIme(builder)
+                        if (surface != null) builder.setSurface(surface)
+                        val cb = asInterface(DISPLAY_CALLBACK, Binder())
+                        val id = createMethod.invoke(
+                            displayManager, builder.build(), cb, null, "com.android.shell"
+                        ) as Int
+                        if (id >= 0) {
+                            callback = cb
+                            displayId = id
+                            out.putInt("displayId", id)
+                            out.putInt("flags", flags)
+                            return out
+                        }
+                    } catch (t: Throwable) {
+                        lastError = unwrap(t)
+                    }
+                }
+                out.putString("error", lastError?.toString() ?: "unknown error")
+            } catch (t: Throwable) {
+                out.putString("error", unwrap(t).toString())
+            }
+        }
+        return out
+    }
+
+    override fun setSurface(args: Bundle): Bundle {
+        val out = Bundle()
+        synchronized(lock) {
+            val cb = callback
+            if (cb == null) {
+                out.putString("error", "no display")
+                return out
+            }
+            try {
+                args.classLoader = Surface::class.java.classLoader
+                val surface = args.getParcelable("surface", Surface::class.java)
+                setSurfaceMethod.invoke(displayManager, cb, surface)
+                out.putInt("displayId", displayId)
+            } catch (t: Throwable) {
+                out.putString("error", unwrap(t).toString())
+            }
+        }
+        return out
+    }
+
+    override fun resizeDisplay(width: Int, height: Int, dpi: Int): Bundle {
+        val out = Bundle()
+        synchronized(lock) {
+            val cb = callback
+            if (cb == null) {
+                out.putString("error", "no display")
+                return out
+            }
+            try {
+                resizeMethod.invoke(displayManager, cb, width, height, dpi)
+                out.putInt("displayId", displayId)
+            } catch (t: Throwable) {
+                out.putString("error", unwrap(t).toString())
+            }
+        }
+        return out
+    }
+
+    override fun releaseDisplay() {
+        synchronized(lock) { releaseLocked() }
+    }
+
+    private fun releaseLocked() {
+        val cb = callback ?: run {
+            displayId = -1
+            return
+        }
+        try {
+            releaseMethod.invoke(displayManager, cb)
+        } catch (t: Throwable) {
+            Log.e("GlassBerryLifecycle", "Virtual display release failed (id=$displayId)", unwrap(t))
+        } finally {
+            callback = null
+            displayId = -1
+        }
+    }
+
+    // ---- apps & input -------------------------------------------------------
+
+    override fun launchApp(component: String, displayId: Int): String {
+        val base = listOf(
+            "/system/bin/cmd", "activity", "start-activity",
+            "--display", displayId.toString(),
+            "--windowingMode", "1",
+        )
+        val first = exec(base + listOf("-f", "0x10000000", "-n", component))
+        if (first.contains("brought to the front", ignoreCase = true) ||
+            first.contains("current task", ignoreCase = true)
+        ) {
+            return exec(base + listOf("-f", "0x18000000", "-n", component))
+        }
+        return first
+    }
+
+    @Synchronized
+    override fun injectEvent(event: Bundle, displayId: Int) {
+        var input: InputEvent? = null
+        try {
+            event.classLoader = InputEvent::class.java.classLoader
+            input = event.getParcelable("event", InputEvent::class.java) ?: return
+            setDisplayIdMethod.invoke(input, displayId)
+            val accepted = injectMethod.invoke(inputManager, input, 0) as? Boolean ?: false
+            lastInputError = if (accepted) "Event diterima oleh InputManager pada display $displayId."
+            else "InputManager menolak event untuk display $displayId."
+            if (!accepted) logInputFailure(lastInputError)
+        } catch (t: Throwable) {
+            lastInputError = "${unwrap(t).javaClass.simpleName}: ${unwrap(t).message ?: "injeksi input gagal"}"
+            logInputFailure(lastInputError, unwrap(t))
+        } finally {
+            (input as? android.view.MotionEvent)?.recycle()
+        }
+    }
+
+    @Synchronized
+    override fun getInputStatus(): String = lastInputError
+
+    private fun logInputFailure(message: String, error: Throwable? = null) {
+        val now = SystemClock.uptimeMillis()
+        if (now - lastInputLogAt < 1_000L) return
+        lastInputLogAt = now
+        if (error == null) Log.e("GlassBerryInput", message)
+        else Log.e("GlassBerryInput", message, error)
+    }
+
+    override fun runShell(command: String): String = exec(listOf("/system/bin/sh", "-c", command))
+
+    override fun getUid(): Int = Process.myUid()
+
+    override fun destroy() {
+        releaseDisplay()
+        exitProcess(0)
+    }
+
+    private fun exec(cmd: List<String>): String = try {
+        val p = ProcessBuilder(cmd).redirectErrorStream(true).start()
+        val text = p.inputStream.bufferedReader().readText()
+        p.waitFor()
+        text
+    } catch (t: Throwable) {
+        "Error: $t"
+    }
+
+    companion object {
+        private const val DISPLAY_MANAGER = "android.hardware.display.IDisplayManager"
+        private const val DISPLAY_CALLBACK = "android.hardware.display.IVirtualDisplayCallback"
+        private const val INPUT_MANAGER = "android.hardware.input.IInputManager"
+
+        private const val PUBLIC = 1
+        private const val PRESENTATION = 1 shl 1
+        private const val OWN_CONTENT_ONLY = 1 shl 3
+        private const val SUPPORTS_TOUCH = 1 shl 6
+        private const val DESTROY_CONTENT_ON_REMOVAL = 1 shl 8
+        private const val TRUSTED = 1 shl 10
+        private const val OWN_DISPLAY_GROUP = 1 shl 11
+        private const val ALWAYS_UNLOCKED = 1 shl 12
+        private const val TOUCH_FEEDBACK_DISABLED = 1 shl 13
+        private const val OWN_FOCUS = 1 shl 14
+        private const val DEVICE_DISPLAY_GROUP = 1 shl 15
+
+        private const val BASE = PUBLIC or PRESENTATION or OWN_CONTENT_ONLY or
+            SUPPORTS_TOUCH or DESTROY_CONTENT_ON_REMOVAL
+
+        private val FLAG_SETS = intArrayOf(
+            BASE or TRUSTED or OWN_DISPLAY_GROUP or ALWAYS_UNLOCKED or TOUCH_FEEDBACK_DISABLED,
+            BASE or TRUSTED,
+            BASE,
+        )
+    }
+}

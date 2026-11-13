@@ -18,8 +18,8 @@ Launcher Android bertema liquid glass ala iOS, dibangun dengan Kotlin + Jetpack 
 - Kustomisasi: jumlah kolom grid, ukuran ikon, bentuk ikon, label, dan icon pack format ADW.
 - Backup dan restore layout serta pengaturan (JSON via Storage Access Framework).
 - Tema gelap, terang, sistem, dan warna dinamis Material You.
-- GlassBerry (app kedua, module `:berry`): virtual phone portrait dengan layar virtual (VirtualDisplay + Presentation) dan keyboard QWERTY ala BlackBerry, lengkap dengan mini OS (Notes, Terminal, Apps, About) yang dikendalikan penuh dari keyboard.
-- GlassBerry + Shizuku: launch aplikasi Android asli ke dalam layar virtual (`am start --display`), sentuhan (tap/swipe) di layar virtual di-inject via `input -d`, terinspirasi [Dextop by NarYuki](https://github.com/NarYuki/Dextop).
+- GlassBerry v2.0 (app kedua, module `:berry`): HP BlackBerry virtual — layar portrait di atas, keyboard QWERTY fisik-style di bawah, lengkap dengan tombol MENU / HOME / BACK.
+- GlassBerry + Shizuku: arsitektur ala [Saku Deck](https://github.com/kerenpandi71-collab/saku-deck) (terinspirasi [Dextop by NarYuki](https://github.com/NarYuki/Dextop)) — Shizuku UserService membuat VirtualDisplay sungguhan (API 33+), aplikasi Android asli di-launch ke layar itu (`am start --display`), sentuhan di-forward langsung (multi-pointer), dan keyboard QWERTY mengetik ke aplikasi via injeksi KeyEvent.
 
 ## Performa
 
@@ -40,7 +40,7 @@ Metadata fastlane untuk F-Droid tersedia di `fastlane/metadata/android/`. APK de
 
 ## Build
 
-Jalankan `./gradlew assembleDebug` atau gunakan GitHub Actions. APK debug tersedia di tab Actions → Build → Artifacts (launcher: `glass-launcher-debug`, GlassBerry: `glassberry-debug`). GlassBerry di-install seperti APK biasa, buka app-nya untuk memakai virtual phone.
+Jalankan `./gradlew assembleDebug` atau gunakan GitHub Actions. APK debug tersedia di tab Actions → Build → Artifacts (launcher: `glass-launcher-debug`, GlassBerry: `glassberry-debug`). GlassBerry butuh Android 13+ (minSdk 33) dan Shizuku berjalan: buka GlassBerry → IZINKAN → pilih aplikasi dari daftar (atau tekan MENU) → aplikasi jalan di layar HP BlackBerry virtual, keyboard QWERTY bisa dipakai untuk mengetik ke aplikasi tersebut.
 
 ## Set sebagai launcher default
 
