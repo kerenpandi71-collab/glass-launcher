@@ -144,7 +144,9 @@ private fun KeyRow(
     Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
         keys.forEachIndexed { index, label ->
             val alt = alts?.getOrNull(index)
-            Key(label, Modifier.weight(1f), alt = alt, onAlt = if (alt != null) onAlt else null) {
+            Key(label, Modifier.weight(1f), alt = alt, onAlt = if (alt != null) {
+                { onAlt?.invoke(alt) }
+            } else null) {
                 onPress(label)
             }
         }
