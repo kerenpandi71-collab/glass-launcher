@@ -1,8 +1,6 @@
 package com.kerenpandi.glasslauncher.ui.home
 
 import android.app.Activity
-import android.appwidget.AppWidgetManager
-import android.appwidget.AppWidgetProviderInfo
 import android.content.Intent
 import android.os.Build
 import android.provider.Settings
@@ -62,14 +60,11 @@ import com.kerenpandi.glasslauncher.SystemActions
 import com.kerenpandi.glasslauncher.data.IconPackStore
 import com.kerenpandi.glasslauncher.data.IconShapes
 import com.kerenpandi.glasslauncher.data.ThemeModes
-import com.kerenpandi.glasslauncher.data.WidgetHosts
 import com.kerenpandi.glasslauncher.ui.glass.GlassPanel
-import com.kerenpandi.glasslauncher.ui.widgets.WidgetPickerDialog
 
 @Composable
 fun SettingsSheet(
     viewModel: LauncherViewModel,
-    homeScreenPage: Int,
     onSetWallpaper: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -77,46 +72,7 @@ fun SettingsSheet(
     val settings = viewModel.settings
     var hiddenDialogOpen by remember { mutableStateOf(false) }
     var resetConfirmOpen by remember { mutableStateOf(false) }
-    var pickerOpen by remember { mutableStateOf(false) }
-    var stackDialogFor by remember { mutableStateOf<Int?>(null) }
 
-    val host = remember { WidgetHosts.get(context) }
-    val manager = remember { AppWidgetManager.getInstance(context) }
-    var pendingWidgetId by remember { mutableStateOf(-1) }
-
-    val configureLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        val id = pendingWidgetId
-        if (result.resultCode == Activity.RESULT_OK && id > 0) {
-            viewModel.addWidget(id, homeScreenPage)
-            Toast.makeText(context, "Widget ditambahkan", Toast.LENGTH_SHORT).show()
-        } else if (id > 0) {
-            runCatching { host.deleteAppWidgetId(id) }
-        }
-        pendingWidgetId = -1
-    }
-    val bindLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        val id = pendingWidgetId
-        if (result.resultCode == Activity.RESULT_OK && id > 0) {
-            val configure = manager.getAppWidgetInfo(id)?.configure
-            if (configure != null) {
-                configureLauncher.launch(
-                    Intent(AppWidgetManager.ACTION_APPWIDGET_CONFIGURE)
-                        .setComponent(configure)
-                        .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id)
-                )
-            } else {
-                viewModel.addWidget(id, homeScreenPage)
-                Toast.makeText(context, "Widget ditambahkan", Toast.LENGTH_SHORT).show()
-                pendingWidgetId = -1
-            }
-        } else {
-            if (id > 0) {
-                runCatching { host.deleteAppWidgetId(id) }
-                Toast.makeText(context, "Pemasangan widget dibatalkan", Toast.LENGTH_SHORT).show()
-            }
-            pendingWidgetId = -1
-        }
-    }
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         uri?.let(viewModel::exportLayout)
     }
@@ -141,7 +97,6 @@ fun SettingsSheet(
     }
 
     val iconPacks = remember { IconPackStore.installedPacks(context) }
-    val installedProviders = remember { manager.installedProviders }
     var shizukuAvailable by remember { mutableStateOf(ShizukuActions.isBinderAvailable()) }
     var shizukuGranted by remember { mutableStateOf(ShizukuActions.hasPermission()) }
 
@@ -241,7 +196,8 @@ fun SettingsSheet(
                             IconShapes.CIRCLE to "Lingkaran",
                             IconShapes.SQUIRCLE to "Squircle",
                             IconShapes.ROUNDED to "Membulat",
-                            IconShapes.SQUARE to "Kotak"
+                            IconShapes.SQUARE to "Kotak",
+                            IconShapes.IOS to "iPhone"
                         ),
                         selected = settings.iconShape,
                         onSelect = { settings.updateIconShape(it) }
@@ -281,41 +237,6 @@ fun SettingsSheet(
                             fontSize = 12.sp,
                             modifier = Modifier.padding(horizontal = 6.dp)
                         )
-                    }
-
-                    SectionTitle("Widget")
-                    SettingRow("Tambah widget") { pickerOpen = true }
-                    Text(
-                        "Widget ditambahkan ke layar utama yang sedang terbuka. Tahan lama widget untuk memindahkannya, tarik titik biru untuk mengubah ukuran. Tekan 'Stack' untuk menggabungkan beberapa widget menjadi satu tumpukan yang berganti otomatis.",
-                        color = Color.White.copy(alpha = 0.6f),
-                        fontSize = 12.sp,
-                        modifier = Modifier.padding(horizontal = 6.dp)
-                    )
-                    viewModel.widgets.forEach { entry ->
-                        val info = manager.getAppWidgetInfo(entry.id)
-                        val label = info?.provider?.let { cn ->
-                            runCatching {
-                                context.packageManager.getApplicationLabel(
-                                    context.packageManager.getApplicationInfo(cn.packageName, 0)
-                                ).toString()
-                            }.getOrNull()
-                        } ?: "Widget #${entry.id}"
-                        Row(
-                            Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                "$label · Layar ${(entry.page + 1).coerceAtMost(settings.homeScreens)} · ${entry.widthDp}×${entry.heightDp} dp",
-                                color = Color.White,
-                                fontSize = 14.sp,
-                                modifier = Modifier.weight(1f)
-                            )
-                            TextButton(onClick = { stackDialogFor = entry.id }) { Text("Stack") }
-                            TextButton(onClick = {
-                                runCatching { host.deleteAppWidgetId(entry.id) }
-                                viewModel.removeWidget(entry.id)
-                            }) { Text("Hapus") }
-                        }
                     }
 
                     SectionTitle("Shizuku")
@@ -389,85 +310,6 @@ fun SettingsSheet(
         }
     }
 
-    if (pickerOpen) {
-        WidgetPickerDialog(
-            providers = installedProviders,
-            onSelect = { info ->
-                pickerOpen = false
-                val id = host.allocateAppWidgetId()
-                pendingWidgetId = id
-                val bound = manager.bindAppWidgetIdIfAllowed(id, info.provider)
-                if (bound) {
-                    val configure = manager.getAppWidgetInfo(id)?.configure
-                    if (configure != null) {
-                        configureLauncher.launch(
-                            Intent(AppWidgetManager.ACTION_APPWIDGET_CONFIGURE)
-                                .setComponent(configure)
-                                .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id)
-                        )
-                    } else {
-                        viewModel.addWidget(id, homeScreenPage)
-                        pendingWidgetId = -1
-                        Toast.makeText(context, "Widget ditambahkan", Toast.LENGTH_SHORT).show()
-                    }
-                } else {
-                    runCatching {
-                        bindLauncher.launch(
-                            Intent(AppWidgetManager.ACTION_APPWIDGET_BIND)
-                                .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id)
-                                .putExtra(AppWidgetManager.EXTRA_APPWIDGET_PROVIDER, info.provider)
-                        )
-                    }.onFailure {
-                        host.deleteAppWidgetId(id)
-                        pendingWidgetId = -1
-                        Toast.makeText(context, "Tidak bisa membuka dialog izin widget", Toast.LENGTH_SHORT).show()
-                    }
-                }
-            },
-            onDismiss = { pickerOpen = false }
-        )
-    }
-
-    stackDialogFor?.let { widgetId ->
-        val currentStack = viewModel.widgets.firstOrNull { it.id == widgetId }?.stackId ?: 0
-        AlertDialog(
-            onDismissRequest = { stackDialogFor = null },
-            title = { Text("Tumpukan widget") },
-            text = {
-                Column {
-                    Text(
-                        if (currentStack > 0) "Widget ini ada di Stack $currentStack."
-                        else "Pilih tumpukan. Widget dalam stack yang sama tampil bergantian otomatis di satu slot.",
-                        fontSize = 14.sp
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        (1..3).forEach { n ->
-                            TextButton(onClick = {
-                                viewModel.setWidgetStack(widgetId, n)
-                                stackDialogFor = null
-                            }) {
-                                Text(
-                                    "Stack $n",
-                                    fontWeight = if (currentStack == n) FontWeight.Bold else FontWeight.Normal
-                                )
-                            }
-                        }
-                    }
-                    if (currentStack > 0) {
-                        TextButton(onClick = {
-                            viewModel.setWidgetStack(widgetId, 0)
-                            stackDialogFor = null
-                        }) { Text("Lepas dari stack") }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { stackDialogFor = null }) { Text("Tutup") }
-            }
-        )
-    }
-
     if (hiddenDialogOpen) {
         HiddenAppsDialog(
             apps = viewModel.allApps,
@@ -481,7 +323,7 @@ fun SettingsSheet(
         AlertDialog(
             onDismissRequest = { resetConfirmOpen = false },
             title = { Text("Reset pengaturan") },
-            text = { Text("Semua pengaturan tampilan akan dikembalikan ke bawaan. Susunan ikon, folder, dock, dan widget tidak diubah.") },
+            text = { Text("Semua pengaturan tampilan akan dikembalikan ke bawaan. Susunan ikon, folder, dan dock tidak diubah.") },
             confirmButton = {
                 TextButton(onClick = {
                     settings.reset()

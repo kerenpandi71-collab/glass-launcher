@@ -97,8 +97,7 @@ object BackupManager {
 
     private val PREF_FILES = listOf(
         "glass_launcher_home",
-        "glass_launcher_settings",
-        "glass_launcher_widgets"
+        "glass_launcher_settings"
     )
 
     fun export(context: Context): String {

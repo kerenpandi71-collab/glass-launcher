@@ -37,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.RectangleShape
@@ -96,13 +97,15 @@ fun AppIcon(
         LocalBadges.current[app.packageName] ?: 0
     } else 0
     val iconPack = settings?.iconPackPackage.orEmpty()
-    val bitmap = remember(app.stableKey(), iconPack) {
+    val iosStyle = settings?.iconShape == IconShapes.IOS
+    val bitmap = remember(app.stableKey(), iconPack, iosStyle) {
         val packed = if (iconPack.isNotBlank()) {
             runCatching {
-                IconPackStore.iconFor(context, iconPack, app)?.toBitmap(96, 96)?.asImageBitmap()
+                IconPackStore.iconFor(context, iconPack, app)
+                    ?.toBitmap(96, 96)?.asImageBitmap()
             }.getOrNull()
         } else null
-        packed ?: cachedAppIcon(app, 96)
+        packed ?: cachedAppIcon(app, if (iosStyle) 144 else 96)
     }
     val iconShape = when (settings?.iconShape) {
         IconShapes.ROUNDED -> RoundedCornerShape(30)
@@ -123,12 +126,32 @@ fun AppIcon(
                 .padding(8.dp)
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Image(
-                    bitmap = bitmap,
-                    contentDescription = app.label,
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.size(effectiveSize).clip(iconShape)
-                )
+                if (iosStyle) {
+                    Box(
+                        Modifier
+                            .size(effectiveSize)
+                            .shadow(2.dp, IOSSquircleShape)
+                            .clip(IOSSquircleShape)
+                            .background(Color.White),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Image(
+                            bitmap = bitmap,
+                            contentDescription = app.label,
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier
+                                .size(effectiveSize * 0.62f)
+                                .clip(RoundedCornerShape(22))
+                        )
+                    }
+                } else {
+                    Image(
+                        bitmap = bitmap,
+                        contentDescription = app.label,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.size(effectiveSize).clip(iconShape)
+                    )
+                }
                 if (badgeCount > 0) {
                     Box(
                         Modifier

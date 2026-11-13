@@ -19,8 +19,6 @@ import com.kerenpandi.glasslauncher.data.BadgeNotificationListener
 import com.kerenpandi.glasslauncher.data.LauncherFolder
 import com.kerenpandi.glasslauncher.data.LauncherSettings
 import com.kerenpandi.glasslauncher.data.OrderStore
-import com.kerenpandi.glasslauncher.data.WidgetEntry
-import com.kerenpandi.glasslauncher.data.WidgetStore
 import com.kerenpandi.glasslauncher.data.stableKey
 import java.util.UUID
 
@@ -28,7 +26,6 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     private val repository = AppRepository(app)
     private val orderStore = OrderStore(app)
-    private val widgetStore = WidgetStore(app)
     val settings = LauncherSettings(app)
 
     private var refreshJob: Job? = null
@@ -42,7 +39,6 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var folders by mutableStateOf<List<LauncherFolder>>(emptyList())
         private set
-    var widgets by mutableStateOf<List<WidgetEntry>>(emptyList())
         private set
     var badges by mutableStateOf<Map<String, Int>>(emptyMap())
         private set
@@ -66,7 +62,6 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
             loadedApps = orderStore.applyOrder(loaded)
             reapplyFilters()
             folders = orderStore.loadFolders(loaded)
-            widgets = widgetStore.prune(getApplication())
         }
     }
 
@@ -155,46 +150,6 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         settings.toggleHiddenApp(key)
     }
 
-    fun addWidget(id: Int, page: Int = 0) {
-        if (widgets.any { it.id == id }) return
-        widgets = widgets + WidgetEntry(id, WidgetStore.DEFAULT_WIDTH, WidgetStore.DEFAULT_HEIGHT, page)
-        widgetStore.save(widgets)
-    }
-
-    fun removeWidget(id: Int) {
-        widgets = widgets.filterNot { it.id == id }
-        widgetStore.save(widgets)
-    }
-
-    fun resizeWidget(id: Int, widthDp: Int, heightDp: Int) {
-        widgets = widgets.map {
-            if (it.id == id) it.copy(widthDp = widthDp, heightDp = heightDp) else it
-        }
-    }
-
-    fun setWidgetStack(id: Int, stackId: Int) {
-        widgets = widgets.map {
-            if (it.id == id) it.copy(stackId = stackId) else it
-        }
-        widgetStore.save(widgets)
-    }
-
-    fun applyPageWidgetOrder(newOrderIds: List<Int>, movedIds: List<Int>, offsetX: Int) {
-        val movedSet = movedIds.toSet()
-        val orderSet = newOrderIds.toSet()
-        widgets = widgets.map {
-            if (it.id in movedSet) it.copy(offsetXDp = offsetX) else it
-        }
-        val byId = widgets.associateBy { it.id }
-        val ordered = newOrderIds.mapNotNull { byId[it] }
-        val rest = widgets.filter { it.id !in orderSet }
-        widgets = rest + ordered
-        widgetStore.save(widgets)
-    }
-
-    fun saveWidgets() {
-        widgetStore.save(widgets)
-    }
 
     fun exportLayout(uri: Uri) {
         val context = getApplication<Application>()

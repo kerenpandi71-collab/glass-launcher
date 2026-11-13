@@ -66,7 +66,6 @@ import com.kerenpandi.glasslauncher.ui.common.cachedAppIcon
 import com.kerenpandi.glasslauncher.ui.glass.GlassPanel
 import com.kerenpandi.glasslauncher.ui.glass.GlassScrim
 import com.kerenpandi.glasslauncher.ui.search.SearchOverlay
-import com.kerenpandi.glasslauncher.ui.widgets.WidgetArea
 
 private sealed interface HomeEntry {
     data class App(val info: AppInfo) : HomeEntry
@@ -154,21 +153,11 @@ fun HomeScreen(
                 beyondViewportPageCount = 1,
                 modifier = Modifier.weight(1f).padding(vertical = 12.dp)
             ) { page ->
-                Column(Modifier.fillMaxSize()) {
-                    WidgetArea(
-                        widgets = viewModel.widgets.filter { it.page == page },
-                        onRemove = { viewModel.removeWidget(it) },
-                        onResize = { id, w, h -> viewModel.resizeWidget(id, w, h) },
-                        onResizeEnd = { viewModel.saveWidgets() },
-                        onMoveCommit = { orderIds, movedIds, offsetX ->
-                            viewModel.applyPageWidgetOrder(orderIds, movedIds, offsetX)
-                        }
-                    )
-                    val pageEntries = pages.getOrElse(page) { emptyList() }
-                    Box(
-                        Modifier.fillMaxWidth().weight(1f)
-                            .homeGestures(onSwipeUp, onSwipeDown, onDoubleTap)
-                    ) {
+                val pageEntries = pages.getOrElse(page) { emptyList() }
+                Box(
+                    Modifier.fillMaxSize()
+                        .homeGestures(onSwipeUp, onSwipeDown, onDoubleTap)
+                ) {
                         if (pageEntries.isNotEmpty()) {
                             AppGridPage(
                                 entries = pageEntries,
@@ -219,7 +208,6 @@ fun HomeScreen(
         ) {
             SettingsSheet(
                 viewModel = viewModel,
-                homeScreenPage = pagerState.currentPage,
                 onSetWallpaper = onSetWallpaper,
                 onDismiss = { settingsOpen = false }
             )

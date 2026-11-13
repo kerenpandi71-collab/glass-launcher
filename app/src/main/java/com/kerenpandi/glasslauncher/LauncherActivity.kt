@@ -7,7 +7,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.runtime.CompositionLocalProvider
-import com.kerenpandi.glasslauncher.data.WidgetHosts
 import com.kerenpandi.glasslauncher.ui.common.LocalBadges
 import com.kerenpandi.glasslauncher.ui.common.LocalLauncherSettings
 import com.kerenpandi.glasslauncher.ui.home.HomeScreen
@@ -40,16 +39,6 @@ class LauncherActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         viewModel.refresh()
-    }
-
-    override fun onStart() {
-        super.onStart()
-        runCatching { WidgetHosts.get(this).startListening() }
-    }
-
-    override fun onStop() {
-        runCatching { WidgetHosts.get(this).stopListening() }
-        super.onStop()
     }
 
     private fun openWallpaperPicker() {

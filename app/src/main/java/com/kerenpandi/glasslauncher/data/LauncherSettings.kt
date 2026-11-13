@@ -17,6 +17,7 @@ object IconShapes {
     const val ROUNDED = "rounded"
     const val SQUIRCLE = "squircle"
     const val SQUARE = "square"
+    const val IOS = "ios"
 }
 
 data class WeatherNow(

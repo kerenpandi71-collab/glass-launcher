@@ -1,0 +1,1 @@
+Fitur widget dihapus. Penambahan gaya ikon iPhone: squircle superellipse dengan latar putih dan bayangan halus yang berlaku otomatis ke semua aplikasi.
