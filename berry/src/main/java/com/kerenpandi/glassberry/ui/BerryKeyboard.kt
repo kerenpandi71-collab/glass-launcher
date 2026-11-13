@@ -15,6 +15,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -150,10 +151,12 @@ private fun Key(
     modifier: Modifier = Modifier,
     special: Boolean = false,
     active: Boolean = false,
+    accent: Boolean = false,
     onPress: () -> Unit,
 ) {
     val bg = when {
-        active -> Berry.Accent
+        accent -> Berry.Accent
+        active -> Berry.KeySpecial
         special -> Berry.KeySpecial
         else -> Berry.Key
     }

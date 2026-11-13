@@ -154,6 +154,7 @@ private fun LoadingPanel() {
 
 @Composable
 private fun ShizukuPanel(c: BerryController) {
+    val ctx = LocalContext.current
     Column(
         Modifier
             .fillMaxSize()
@@ -188,7 +189,7 @@ private fun ShizukuPanel(c: BerryController) {
         Spacer(Modifier.height(20.dp))
         when (c.shizukuState) {
             ShizukuState.NOT_INSTALLED, ShizukuState.NOT_RUNNING ->
-                PillButton("BUKA SHIZUKU") { c.openShizuku(LocalContext.current) }
+                PillButton("BUKA SHIZUKU") { c.openShizuku(ctx) }
             ShizukuState.NO_PERMISSION -> PillButton("IZINKAN") { c.requestPermission() }
             else -> PillButton("COBA LAGI") { c.retryDisplay() }
         }
