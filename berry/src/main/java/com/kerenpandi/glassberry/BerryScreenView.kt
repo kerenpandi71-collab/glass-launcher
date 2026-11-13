@@ -81,6 +81,7 @@ class BerryScreenView(context: Context) : View(context) {
                 BerryOS.Screen.HOME -> drawHome(canvas, os, w, h, barH)
                 BerryOS.Screen.NOTES -> drawNotes(canvas, os, w, h, barH)
                 BerryOS.Screen.TERMINAL -> drawTerminal(canvas, os, w, h, barH)
+                BerryOS.Screen.APPS -> drawApps(canvas, os, w, h, barH)
                 BerryOS.Screen.ABOUT -> drawAbout(canvas, os, w, h, barH)
             }
         }
@@ -167,6 +168,44 @@ class BerryScreenView(context: Context) : View(context) {
                 canvas.drawText(line, dp(10f), y, mono)
                 y += lineH
             }
+        }
+    }
+
+    private fun drawApps(canvas: Canvas, os: BerryOS, w: Float, h: Float, barH: Float) {
+        drawAppHeader(canvas, "Apps", w, barH)
+        val list = os.filteredReal
+        if (os.filter.isNotEmpty()) {
+            dim.textSize = dp(12f)
+            canvas.drawText("\"${os.filter}\"", dp(12f), barH + dp(30f), dim)
+        }
+        if (list.isEmpty()) {
+            val hint = if (os.filter.isEmpty()) "Memuat daftar aplikasi…" else "Tidak ditemukan"
+            val hw = dim.measureText(hint)
+            canvas.drawText(hint, (w - hw) / 2, barH + dp(90f), dim)
+        } else {
+            var y = barH + dp(44f)
+            val maxItems = ((h - barH - dp(64f)) / dp(38f)).toInt().coerceAtLeast(1)
+            list.take(maxItems).forEachIndexed { i, app ->
+                val selected = i == os.selectedIndex.coerceIn(0, list.lastIndex)
+                if (selected) {
+                    canvas.drawRect(dp(8f), y, w - dp(8f), y + dp(36f), selPaint)
+                    canvas.drawRect(dp(8f), y, dp(12f), y + dp(36f), accentPaint)
+                }
+                white.textSize = dp(15f)
+                canvas.drawText(app.label, dp(24f), y + dp(24f), white)
+                y += dp(38f)
+            }
+        }
+
+        dim.textSize = dp(11f)
+        canvas.drawText(os.shizukuStatusText(), dp(12f), h - dp(24f), dim)
+        if (os.status.isNotEmpty()) {
+            val status = if (os.status.length > 42) os.status.take(42) + "…" else os.status
+            canvas.drawText(status, dp(12f), h - dp(8f), white)
+        } else {
+            val foot = "⏎ buka di layar virtual · ⎋ kembali"
+            val fw = dim.measureText(foot)
+            canvas.drawText(foot, (w - fw) / 2, h - dp(8f), dim)
         }
     }
 

@@ -2,7 +2,9 @@ package com.kerenpandi.glassberry
 
 import android.app.Activity
 import android.hardware.display.DisplayManager
+import android.os.Build
 import android.os.Bundle
+import android.view.MotionEvent
 import android.view.Display
 import android.view.KeyEvent
 import android.view.Surface
@@ -90,6 +92,10 @@ class MainActivity : Activity() {
 
         val surface = SurfaceView(this)
         surface.holder.addCallback(surfaceCallback)
+        surface.setOnTouchListener { _, event ->
+            handleTouchPassthrough(event)
+            true
+        }
         screenContainer.addView(
             surface,
             FrameLayout.LayoutParams(
@@ -125,6 +131,37 @@ class MainActivity : Activity() {
             }
             upstream?.uncaughtException(thread, error)
         }
+    }
+
+    private var touchDownX = 0f
+    private var touchDownY = 0f
+
+    private fun handleTouchPassthrough(event: MotionEvent) {
+        if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+            touchDownX = event.x
+            touchDownY = event.y
+            return
+        }
+        if (event.actionMasked != MotionEvent.ACTION_UP) return
+        val os = presentation?.berryOS ?: fallbackView?.os ?: return
+        val displayId = os.displayId
+        if (displayId <= 0 || Build.VERSION.SDK_INT < 29) return
+        if (!BerryShizuku.hasPermission()) return
+        val dx = event.x - touchDownX
+        val dy = event.y - touchDownY
+        val cmd = if (dx * dx + dy * dy > 900f) {
+            arrayOf(
+                "input", "-d", displayId.toString(), "swipe",
+                touchDownX.toInt().toString(), touchDownY.toInt().toString(),
+                event.x.toInt().toString(), event.y.toInt().toString(), "250"
+            )
+        } else {
+            arrayOf(
+                "input", "-d", displayId.toString(), "tap",
+                event.x.toInt().toString(), event.y.toInt().toString()
+            )
+        }
+        BerryShizuku.exec(cmd) { _, _ -> }
     }
 
     private fun hideSystemBars() {
@@ -168,6 +205,7 @@ class MainActivity : Activity() {
         }
 
         pendingPresentation = pres
+        pres.berryOS.displayId = vd.display.displayId
         showPendingPresentation()
     }
 
@@ -208,8 +246,10 @@ class MainActivity : Activity() {
     private fun fallbackToDirectView() {
         if (fallbackView == null) {
             val view = BerryScreenView(this)
-            view.os = BerryOS(this)
-            view.os?.showCrashLog()
+            val os = BerryOS(this)
+            os.invalidate = { view.invalidate() }
+            view.os = os
+            os.showCrashLog()
             fallbackView = view
             screenContainer.addView(
                 view,

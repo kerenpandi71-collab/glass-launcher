@@ -15,6 +15,7 @@ class BerryPresentation(context: Context, display: Display) : Presentation(conte
         super.onCreate(savedInstanceState)
         screenView = BerryScreenView(context)
         screenView.os = berryOS
+        berryOS.invalidate = { screenView.invalidate() }
         setContentView(screenView)
         berryOS.showCrashLog()
     }
