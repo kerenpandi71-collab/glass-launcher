@@ -499,14 +499,19 @@ class BerryController(private val app: Application) {
         val dpi = (app.resources.displayMetrics.densityDpi * dpiScale).toInt().coerceIn(120, 480)
         if (w <= 0 || h <= 0) return
         worker.execute {
-            val out = runCatching { svc.resizeDisplay(w, h, dpi) }.getOrElse { "Error: ${it.message}" }
+            val result = runCatching { svc.resizeDisplay(w, h, dpi) }
             main.post {
-                if (out.contains("Error", true) || out.contains("Exception", true)) {
-                    message = "Gagal mengubah tampilan: ${out.trim().take(150)}"
-                } else {
-                    displayW = w
-                    displayH = h
-                    message = "Tampilan: ${w}x${h} @ ${dpi}dpi"
+                result.onSuccess { b ->
+                    val err = b?.getString("error")
+                    if (err != null) {
+                        message = "Gagal mengubah tampilan: $err"
+                    } else {
+                        displayW = w
+                        displayH = h
+                        message = "Tampilan: ${w}x${h} @ ${dpi}dpi"
+                    }
+                }.onFailure {
+                    message = "Gagal mengubah tampilan: ${it.message}"
                 }
             }
         }
