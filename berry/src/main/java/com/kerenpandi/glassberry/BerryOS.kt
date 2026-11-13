@@ -88,6 +88,18 @@ class BerryOS(context: Context) {
         }
     }
 
+    fun showCrashLog() {
+        val trace = CrashLog.last ?: return
+        CrashLog.last = null
+        screen = Screen.TERMINAL
+        terminalLines += "--- CRASH TERDETEKSI ---"
+        trace.lines().take(60).forEach { terminalLines += it }
+        terminalLines += "--- AKHIR LOG ---"
+        terminalLines += "Screenshot layar ini dan kirim"
+        terminalLines += "ke developer. Ketik 'clear' untuk hapus."
+        terminalLines += ""
+    }
+
     private fun runCommand() {
         val cmd = terminalInput.trim()
         terminalInput = ""

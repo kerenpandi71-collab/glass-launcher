@@ -16,5 +16,6 @@ class BerryPresentation(context: Context, display: Display) : Presentation(conte
         screenView = BerryScreenView(context)
         screenView.os = berryOS
         setContentView(screenView)
+        berryOS.showCrashLog()
     }
 }

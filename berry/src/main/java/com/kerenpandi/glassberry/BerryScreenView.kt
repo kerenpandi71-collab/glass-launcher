@@ -76,11 +76,13 @@ class BerryScreenView(context: Context) : View(context) {
         canvas.drawText(batt, w - dp(12f) - white.measureText(batt), barH - dp(9f), white)
 
         val os = os ?: return
-        when (os.screen) {
-            BerryOS.Screen.HOME -> drawHome(canvas, os, w, h, barH)
-            BerryOS.Screen.NOTES -> drawNotes(canvas, os, w, h, barH)
-            BerryOS.Screen.TERMINAL -> drawTerminal(canvas, os, w, h, barH)
-            BerryOS.Screen.ABOUT -> drawAbout(canvas, os, w, h, barH)
+        runCatching {
+            when (os.screen) {
+                BerryOS.Screen.HOME -> drawHome(canvas, os, w, h, barH)
+                BerryOS.Screen.NOTES -> drawNotes(canvas, os, w, h, barH)
+                BerryOS.Screen.TERMINAL -> drawTerminal(canvas, os, w, h, barH)
+                BerryOS.Screen.ABOUT -> drawAbout(canvas, os, w, h, barH)
+            }
         }
     }
 
