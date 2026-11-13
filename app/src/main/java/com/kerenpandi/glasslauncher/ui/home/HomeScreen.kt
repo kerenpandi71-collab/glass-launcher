@@ -1,9 +1,12 @@
 package com.kerenpandi.glasslauncher.ui.home
 
-import android.os.Build
-import android.view.WindowManager
-import android.appwidget.AppWidgetHost
+// Feature-branch build verification.
 
+import android.os.Build
+import android.widget.Toast
+import android.view.WindowManager
+
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -11,6 +14,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.verticalScroll
@@ -24,19 +28,25 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.*
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.runtime.*
-import androidx.activity.compose.BackHandler
-import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.launch
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.foundation.border
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -44,16 +54,18 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogWindowProvider
 import com.kerenpandi.glasslauncher.LauncherViewModel
+import com.kerenpandi.glasslauncher.SystemActions
 import com.kerenpandi.glasslauncher.data.AppInfo
 import com.kerenpandi.glasslauncher.data.LauncherFolder
 import com.kerenpandi.glasslauncher.data.stableKey
 import com.kerenpandi.glasslauncher.ui.common.AppIcon
 import com.kerenpandi.glasslauncher.ui.common.AppMenuItem
 import com.kerenpandi.glasslauncher.ui.common.ClockHeader
-import com.kerenpandi.glasslauncher.ui.common.cachedAppIcon
 import com.kerenpandi.glasslauncher.ui.common.GlassIconButton
+import com.kerenpandi.glasslauncher.ui.common.cachedAppIcon
 import com.kerenpandi.glasslauncher.ui.glass.GlassPanel
 import com.kerenpandi.glasslauncher.ui.glass.GlassScrim
+import com.kerenpandi.glasslauncher.ui.search.SearchOverlay
 
 private sealed interface HomeEntry {
     data class App(val info: AppInfo) : HomeEntry
@@ -63,31 +75,17 @@ private sealed interface HomeEntry {
 @Composable
 fun HomeScreen(
     viewModel: LauncherViewModel,
-    onSetWallpaper: () -> Unit,
-    appWidgetHost: AppWidgetHost,
-    widgetIds: List<Int>,
-    onAddWidget: () -> Unit,
-    onRemoveWidget: (Int) -> Unit
+    onSetWallpaper: () -> Unit
 ) {
     var settingsOpen by remember { mutableStateOf(false) }
-    var recentOpen by remember { mutableStateOf(false) }
+    var searchOpen by remember { mutableStateOf(false) }
+    var lockPromptOpen by remember { mutableStateOf(false) }
     var selectedFolder by remember { mutableStateOf<LauncherFolder?>(null) }
     var folderPickerApp by remember { mutableStateOf<AppInfo?>(null) }
     var createFolderApp by remember { mutableStateOf<AppInfo?>(null) }
 
-    BackHandler(
-        enabled = settingsOpen || recentOpen || selectedFolder != null ||
-            folderPickerApp != null || createFolderApp != null
-    ) {
-        when {
-            createFolderApp != null -> createFolderApp = null
-            folderPickerApp != null -> folderPickerApp = null
-            selectedFolder != null -> selectedFolder = null
-            recentOpen -> recentOpen = false
-            settingsOpen -> settingsOpen = false
-        }
-    }
-
+    val context = LocalContext.current
+    val settings = viewModel.settings
     val apps = viewModel.apps
     val dockApps = viewModel.dockApps
     val folders = viewModel.folders
@@ -96,21 +94,53 @@ fun HomeScreen(
         apps.filterNot { it.stableKey() in folderedKeys }.map { HomeEntry.App(it) } +
             folders.map { HomeEntry.Folder(it) }
     }
-    val pages = remember(entries) { entries.chunked(LauncherViewModel.APPS_PER_PAGE) }
-    val pageCount = pages.size.coerceAtLeast(1)
+    val perPage = viewModel.appsPerPage
+    val pages = remember(entries, perPage) { entries.chunked(perPage) }
+    val pageCount = maxOf(pages.size, settings.homeScreens)
     val dockKeys = remember(dockApps) { dockApps.map { it.stableKey() }.toSet() }
     val dockFull = dockApps.size >= LauncherViewModel.DOCK_CAPACITY
 
+    val pagerState = rememberPagerState(pageCount = { pageCount })
+    val scope = rememberCoroutineScope()
+    BackHandler(enabled = settingsOpen) { settingsOpen = false }
+    BackHandler(enabled = searchOpen) { searchOpen = false }
+    BackHandler(enabled = !settingsOpen && !searchOpen && pagerState.currentPage > 0) {
+        scope.launch { pagerState.animateScrollToPage(0) }
+    }
+
+    val onSwipeUp: () -> Unit = { if (!searchOpen && !settingsOpen) searchOpen = true }
+    val onSwipeDown: () -> Unit = {
+        if (!searchOpen && !settingsOpen) {
+            SystemActions.expandNotificationsPanel(context)
+        }
+    }
+    val onDoubleTap: () -> Unit = {
+        if (!searchOpen && !settingsOpen) {
+            if (SystemActions.isAdminActive(context)) {
+                if (!SystemActions.lockScreen(context)) {
+                    Toast.makeText(context, "Gagal mengunci layar", Toast.LENGTH_SHORT).show()
+                }
+            } else {
+                lockPromptOpen = true
+            }
+        }
+    }
+
     Box(Modifier.fillMaxSize()) {
-        GlassScrim()
+        GlassScrim(darken = if (settings.themeMode == com.kerenpandi.glasslauncher.data.ThemeModes.LIGHT) 0.10f else 0.22f)
         Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
             Row(
-                Modifier.fillMaxWidth().padding(top = 36.dp),
+                Modifier.fillMaxWidth().padding(top = 36.dp)
+                    .homeGestures(onSwipeUp, onSwipeDown, onDoubleTap),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                TextButton(onClick = { recentOpen = true }) { Text("Recent", color = Color.White) }
-                ClockHeader()
+                GlassIconButton(
+                    icon = Icons.Default.Search,
+                    contentDescription = "Cari aplikasi",
+                    onClick = { searchOpen = true }
+                )
+                ClockHeader(modifier = Modifier.weight(1f))
                 GlassIconButton(
                     icon = Icons.Default.Settings,
                     contentDescription = "Pengaturan",
@@ -118,37 +148,37 @@ fun HomeScreen(
                 )
             }
 
-            HomeWidgets(
-                context = LocalContext.current,
-                host = appWidgetHost,
-                widgetIds = widgetIds,
-                onAdd = onAddWidget,
-                onRemove = onRemoveWidget
-            )
-
-            val pagerState = rememberPagerState(pageCount = { pageCount })
             HorizontalPager(
                 state = pagerState,
                 beyondViewportPageCount = 1,
                 modifier = Modifier.weight(1f).padding(vertical = 12.dp)
             ) { page ->
-                if (entries.isEmpty()) EmptyHomeHint()
-                else AppGridPage(
-                    entries = pages[page],
-                    allApps = apps,
-                    pageCount = pageCount,
-                    dockKeys = dockKeys,
-                    dockFull = dockFull,
-                    folders = folders,
-                    onMovePage = { key, direction -> viewModel.movePage(key, direction) },
-                    onAddToDock = { viewModel.addToDock(it) },
-                    onAppClick = { viewModel.launch(it) },
-                    onOpenFolder = { selectedFolder = it },
-                    onCreateFolder = { createFolderApp = it },
-                    onMoveToFolder = { folderPickerApp = it },
-                    onRenameFolder = { folder, name -> viewModel.renameFolder(folder.id, name) },
-                    onDeleteFolder = { viewModel.deleteFolder(it.id) }
-                )
+                val pageEntries = pages.getOrElse(page) { emptyList() }
+                Box(
+                    Modifier.fillMaxSize()
+                        .homeGestures(onSwipeUp, onSwipeDown, onDoubleTap)
+                ) {
+                        if (pageEntries.isNotEmpty()) {
+                            AppGridPage(
+                                entries = pageEntries,
+                                allApps = apps,
+                                pageCount = pageCount,
+                                dockKeys = dockKeys,
+                                dockFull = dockFull,
+                                folders = folders,
+                                columns = settings.gridColumns,
+                                onMovePage = { key, direction -> viewModel.movePage(key, direction) },
+                                onAddToDock = { viewModel.addToDock(it) },
+                                onAppClick = { viewModel.launch(it) },
+                                onHideApp = { viewModel.toggleHiddenApp(it) },
+                                onOpenFolder = { selectedFolder = it },
+                                onCreateFolder = { createFolderApp = it },
+                                onMoveToFolder = { folderPickerApp = it },
+                                onRenameFolder = { folder, name -> viewModel.renameFolder(folder.id, name) },
+                                onDeleteFolder = { viewModel.deleteFolder(it.id) }
+                            )
+                        }
+                    }
             }
 
             Row(
@@ -165,6 +195,7 @@ fun HomeScreen(
                 onAppClick = { viewModel.launch(it) },
                 onRemoveFromDock = { viewModel.removeFromDock(it) },
                 modifier = Modifier.padding(bottom = 20.dp)
+                    .homeGestures(onSwipeUp, onSwipeDown, onDoubleTap)
             )
         }
 
@@ -175,13 +206,28 @@ fun HomeScreen(
             modifier = Modifier.fillMaxSize()
         ) {
             SettingsSheet(
+                viewModel = viewModel,
                 onSetWallpaper = onSetWallpaper,
                 onDismiss = { settingsOpen = false }
             )
         }
-    }
 
-    if (recentOpen) RecentAppsDialog(onDismiss = { recentOpen = false })
+        AnimatedVisibility(
+            visible = searchOpen,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            SearchOverlay(
+                apps = apps,
+                onLaunch = {
+                    viewModel.launch(it)
+                    searchOpen = false
+                },
+                onDismiss = { searchOpen = false }
+            )
+        }
+    }
 
     selectedFolder?.let { folder ->
         FolderDialog(
@@ -189,7 +235,10 @@ fun HomeScreen(
             allApps = apps,
             folders = folders,
             onDismiss = { selectedFolder = null },
-            onLaunch = { viewModel.launch(it) },
+            onLaunch = {
+                viewModel.launch(it)
+                selectedFolder = null
+            },
             onRemove = { viewModel.removeAppFromFolder(it, folder.id) },
             onRename = { viewModel.renameFolder(folder.id, it) },
             onAdd = { viewModel.addAppToFolder(it, folder.id) }
@@ -213,16 +262,22 @@ fun HomeScreen(
             onCreate = { second, name -> viewModel.createFolder(app, second, name); createFolderApp = null }
         )
     }
-}
 
-@Composable
-private fun EmptyHomeHint() {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        GlassPanel(shape = RoundedCornerShape(24.dp)) {
-            Text("Tidak ada aplikasi", color = Color.White.copy(alpha = 0.8f),
-                textAlign = TextAlign.Center, fontSize = 13.sp,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 18.dp))
-        }
+    if (lockPromptOpen) {
+        AlertDialog(
+            onDismissRequest = { lockPromptOpen = false },
+            title = { Text("Kunci layar") },
+            text = { Text("Aktifkan admin perangkat agar double-tap pada layar dapat mengunci perangkat.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    lockPromptOpen = false
+                    SystemActions.requestAdmin(context)
+                }) { Text("Aktifkan") }
+            },
+            dismissButton = {
+                TextButton(onClick = { lockPromptOpen = false }) { Text("Batal") }
+            }
+        )
     }
 }
 
@@ -236,11 +291,7 @@ fun Dock(
     GlassPanel(modifier = modifier.fillMaxWidth(), shape = RoundedCornerShape(30.dp)) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-            if (apps.isEmpty()) {
-                Text("Tahan ikon di atas lalu pilih \"Tambahkan ke dock\"",
-                    color = Color.White.copy(alpha = 0.6f), fontSize = 11.sp,
-                    textAlign = TextAlign.Center, modifier = Modifier.padding(vertical = 18.dp))
-            } else apps.forEach { app ->
+            apps.forEach { app ->
                 AppIcon(app = app, showLabel = false, onClick = { onAppClick(app) },
                     extraMenuItems = listOf(AppMenuItem("Lepas dari dock") { onRemoveFromDock(app.stableKey()) }))
             }
@@ -256,9 +307,11 @@ private fun AppGridPage(
     dockKeys: Set<String>,
     dockFull: Boolean,
     folders: List<LauncherFolder>,
+    columns: Int,
     onMovePage: (String, Int) -> Unit,
     onAddToDock: (AppInfo) -> Unit,
     onAppClick: (AppInfo) -> Unit,
+    onHideApp: (String) -> Unit,
     onOpenFolder: (LauncherFolder) -> Unit,
     onCreateFolder: (AppInfo) -> Unit,
     onMoveToFolder: (AppInfo) -> Unit,
@@ -266,7 +319,7 @@ private fun AppGridPage(
     onDeleteFolder: (LauncherFolder) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val rows = entries.chunked(4)
+    val rows = entries.chunked(columns)
     Column(modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         rows.forEach { rowEntries ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -279,6 +332,7 @@ private fun AppGridPage(
                                 app = app, modifier = Modifier.weight(1f), onClick = { onAppClick(app) },
                                 extraMenuItems = buildList {
                                     if (!dockFull && key !in dockKeys) add(AppMenuItem("Tambahkan ke dock") { onAddToDock(app) })
+                                    add(AppMenuItem("Sembunyikan aplikasi") { onHideApp(key) })
                                     if (pageCount > 1) {
                                         add(AppMenuItem("Pindah ke halaman sebelumnya") { onMovePage(key, -1) })
                                         add(AppMenuItem("Pindah ke halaman berikutnya") { onMovePage(key, 1) })
@@ -298,7 +352,7 @@ private fun AppGridPage(
                         )
                     }
                 }
-                repeat(4 - rowEntries.size) { Spacer(Modifier.weight(1f)) }
+                repeat(columns - rowEntries.size) { Spacer(Modifier.weight(1f)) }
             }
         }
     }
@@ -351,9 +405,9 @@ private fun FolderTile(
                 modifier = Modifier.fillMaxWidth().padding(top = 5.dp))
         }
         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false },
-            containerColor = Color(0xFF141C2E)) {
-            DropdownMenuItem(text = { Text("Ubah nama", color = Color.White) }, onClick = { menuOpen = false; renameOpen = true })
-            DropdownMenuItem(text = { Text("Hapus folder", color = Color.White) }, onClick = { menuOpen = false; onDelete() })
+            containerColor = MaterialTheme.colorScheme.surface) {
+            DropdownMenuItem(text = { Text("Ubah nama", color = MaterialTheme.colorScheme.onSurface) }, onClick = { menuOpen = false; renameOpen = true })
+            DropdownMenuItem(text = { Text("Hapus folder", color = MaterialTheme.colorScheme.onSurface) }, onClick = { menuOpen = false; onDelete() })
         }
     }
     if (renameOpen) AlertDialog(
@@ -383,6 +437,8 @@ private fun FolderDialog(
     val available = allApps.filter { app ->
         folders.none { f -> app.stableKey() in f.appKeys } && app.stableKey() !in folder.appKeys
     }
+
+    BackHandler(enabled = addMode) { addMode = false }
 
     Dialog(
         onDismissRequest = onDismiss,

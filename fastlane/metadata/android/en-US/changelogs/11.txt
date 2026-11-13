@@ -1,0 +1,1 @@
+Widget Stack ala iOS: gabungkan beberapa widget menjadi satu tumpukan yang berganti otomatis tiap 30 detik dengan titik navigasi. Teks layar kosong dihapus.

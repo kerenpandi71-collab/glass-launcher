@@ -1,0 +1,3 @@
+- Fitur baru: pencarian aplikasi, badge notifikasi, widget dengan resize, sembunyikan aplikasi, kustomisasi grid & ikon, backup/restore, cuaca & agenda, tema Material You, gestur
+- Perbaikan: izin Shizuku dan force-stop aplikasi, panel pengaturan kini bisa di-scroll penuh
+- Fitur Recent apps dihapus

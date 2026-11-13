@@ -1,0 +1,23 @@
+Glass Launcher adalah launcher Android bertema liquid glass yang dibangun dengan Kotlin dan Jetpack Compose, dirancang tetap ringan untuk perangkat entry-level.
+
+FITUR
+• Home screen liquid glass di atas wallpaper sistem
+• Halaman aplikasi dengan swipe horizontal dan indikator halaman
+• Dock kaca yang dapat diatur hingga empat aplikasi
+• Folder bergaya iPhone dengan edit nama, tambah, dan keluarkan aplikasi
+• Pencarian aplikasi cepat
+• Badge jumlah notifikasi per aplikasi (opsional, via akses notifikasi)
+• Widget Android dengan pengubahan ukuran
+• Sembunyikan aplikasi dari home dan pencarian
+• Kustomisasi: kolom grid, ukuran ikon, bentuk ikon, label, dan icon pack format ADW
+• Backup dan restore layout serta pengaturan (JSON)
+• At a Glance: cuaca (Open-Meteo) dan agenda kalender berikutnya
+• Tema gelap, terang, sistem, dan warna dinamis Material You
+• Gestur: geser ke atas untuk pencarian, geser ke bawah untuk panel notifikasi, double-tap untuk kunci layar
+• Hentikan aplikasi secara paksa melalui Shizuku (opsional)
+• Mendukung aplikasi clone / Dual Apps dan work profile
+
+PRIVASI
+• Tanpa iklan, tanpa pelacakan, tanpa analitik
+• Sumber terbuka sepenuhnya
+• Cuaca menggunakan API publik Open-Meteo tanpa kunci API
