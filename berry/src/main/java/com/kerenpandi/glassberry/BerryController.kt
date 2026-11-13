@@ -62,8 +62,6 @@ class BerryController(private val app: Application) {
         private set
     var touchpadHidden by mutableStateOf(false)
         private set
-    var blockIme by mutableStateOf(false)
-        private set
 
     val deviceDensityDpi: Int
         get() = app.resources.displayMetrics.densityDpi
@@ -306,7 +304,6 @@ class BerryController(private val app: Application) {
                         putInt("width", w)
                         putInt("height", h)
                         putInt("dpi", dpi)
-                        putBoolean("blockIme", blockIme)
                     })
                 }
             }
@@ -357,6 +354,11 @@ class BerryController(private val app: Application) {
                     inputWorker.execute {
                         try {
                             if (svc != null) {
+                                if (imeSuppressed) {
+                                    disabledImes.toList().forEach { id -> runCatching { svc.runShell("ime enable $id") } }
+                                    disabledImes.clear()
+                                    imeSuppressed = false
+                                }
                                 runCatching { svc.runShell("settings put secure swipe_up_to_switch_apps_enabled 1") }
                                 runCatching { svc.releaseDisplay() }
                             }
@@ -611,33 +613,15 @@ class BerryController(private val app: Application) {
         newResScale: Float,
         hideKeyboard: Boolean,
         hideTouchpad: Boolean,
-        newBlockIme: Boolean,
     ) {
         keyboardHidden = hideKeyboard
         touchpadHidden = hideTouchpad
         val resChanged = kotlin.math.abs(newResScale - resScale) > 0.001f
-        val imeChanged = newBlockIme != blockIme
         dpiScale = newDpiScale.coerceIn(0.4f, 1.2f)
         resScale = newResScale.coerceIn(0.5f, 1f)
-        blockIme = newBlockIme
         val svc = service ?: return
         val id = displayId
         if (id < 0 || displayW <= 0 || displayH <= 0) return
-        if (imeChanged) {
-            busy = true
-            worker.execute {
-                runCatching { svc.releaseDisplay() }
-                main.post {
-                    busy = false
-                    displayId = -1
-                    displayW = 0
-                    displayH = 0
-                    message = if (blockIme) "Keyboard Android dimatikan, layar disiapkan ulang…" else "Keyboard Android diaktifkan, layar disiapkan ulang…"
-                    ensureDisplay()
-                }
-            }
-            return
-        }
         if (resChanged) {
             message = "Resolusi diubah ke ${(surfaceW * resScale).toInt()}x${(surfaceH * resScale).toInt()}"
             return
@@ -679,9 +663,37 @@ class BerryController(private val app: Application) {
         }
     }
 
+    // ---- android IME suppression ----------------------------------------------
+
+    private var imeSuppressed = false
+    private val disabledImes = mutableListOf<String>()
+
+    private fun setImeSuppressed(blocked: Boolean) {
+        if (blocked == imeSuppressed) return
+        imeSuppressed = blocked
+        val svc = service ?: return
+        worker.execute {
+            runCatching {
+                if (blocked) {
+                    val ids = svc.runShell("ime list -s")
+                        .lines()
+                        .map { it.trim() }
+                        .filter { it.isNotEmpty() }
+                    disabledImes.clear()
+                    disabledImes.addAll(ids)
+                    ids.forEach { svc.runShell("ime disable $it") }
+                } else {
+                    disabledImes.toList().forEach { svc.runShell("ime enable $it") }
+                    disabledImes.clear()
+                }
+            }
+        }
+    }
+
     // ---- QWERTY keyboard input ----------------------------------------------
 
     fun sendChar(c: Char) {
+        setImeSuppressed(true)
         if (pickerOpen) {
             search += c
             return
@@ -690,6 +702,7 @@ class BerryController(private val app: Application) {
     }
 
     fun sendBackspace() {
+        setImeSuppressed(true)
         if (pickerOpen) {
             search = search.dropLast(1)
             return
@@ -699,6 +712,7 @@ class BerryController(private val app: Application) {
     }
 
     fun sendEnter() {
+        setImeSuppressed(true)
         if (pickerOpen) {
             filteredApps.firstOrNull()?.let { launch(it) }
             return
@@ -726,6 +740,7 @@ class BerryController(private val app: Application) {
     }
 
     fun sendKey(keyCode: Int, down: Boolean) {
+        if (down) setImeSuppressed(true)
         val svc = service ?: return
         val id = displayId
         if (id < 0) return
@@ -742,6 +757,7 @@ class BerryController(private val app: Application) {
 
     fun sendText(text: String): Boolean {
         if (text.isEmpty()) return true
+        setImeSuppressed(true)
         val svc = service ?: return false
         val id = displayId
         if (id < 0) return false
@@ -762,6 +778,7 @@ class BerryController(private val app: Application) {
         val svc = service ?: return true
         val id = displayId
         if (id < 0 || pickerOpen) return true
+        if (e.actionMasked == MotionEvent.ACTION_DOWN) setImeSuppressed(false)
         if (displayW <= 0 || displayH <= 0 || viewW <= 0 || viewH <= 0) return true
         if (e.actionMasked == MotionEvent.ACTION_SCROLL) {
             inject(svc, e, id)

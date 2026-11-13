@@ -114,7 +114,10 @@ fun BerryScreen(c: BerryController) {
         ) {
             SpeakerGrill()
             NavStrip(c)
-            if (!c.keyboardHidden) BerryKeyboard(c)
+            if (!c.keyboardHidden) {
+                Spacer(Modifier.height(10.dp))
+                BerryKeyboard(c)
+            }
             if (!c.touchpadHidden) Trackpad(c, Modifier.weight(1f))
         }
     }
@@ -455,9 +458,10 @@ private fun Trackpad(c: BerryController, modifier: Modifier = Modifier) {
                                 c.trackpadDragEnd()
                             } else if (!twoFinger &&
                                 System.currentTimeMillis() - startTime < 260 &&
-                                moved < 12f
+                                moved < 12f &&
+                                !c.pickerOpen
                             ) {
-                                if (c.pickerOpen) c.sendEnter() else c.trackpadTap()
+                                c.trackpadTap()
                             }
                             break
                         }
@@ -521,7 +525,6 @@ private fun DisplaySettingsDialog(c: BerryController) {
     var res by remember(c.showDisplaySettings) { mutableStateOf(c.resScale) }
     var hideKb by remember(c.showDisplaySettings) { mutableStateOf(c.keyboardHidden) }
     var hidePad by remember(c.showDisplaySettings) { mutableStateOf(c.touchpadHidden) }
-    var blockIme by remember(c.showDisplaySettings) { mutableStateOf(c.blockIme) }
     val (baseW, baseH) = c.surfaceSize
     Dialog(onDismissRequest = { c.showDisplaySettings = false }) {
         Column(
@@ -572,7 +575,13 @@ private fun DisplaySettingsDialog(c: BerryController) {
             Spacer(Modifier.height(8.dp))
             SettingToggle("Sembunyikan keyboard", hideKb) { hideKb = !hideKb }
             SettingToggle("Sembunyikan touchpad", hidePad) { hidePad = !hidePad }
-            SettingToggle("Cegah keyboard Android muncul", blockIme) { blockIme = !blockIme }
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "Keyboard Android otomatis mati saat kamu mengetik dengan keyboard GlassBerry, " +
+                    "dan menyala lagi saat kamu menyentuh layar virtual langsung.",
+                color = Berry.InkDim,
+                fontSize = 11.sp,
+            )
             Spacer(Modifier.height(16.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Box(
@@ -592,7 +601,7 @@ private fun DisplaySettingsDialog(c: BerryController) {
                         .clip(RoundedCornerShape(10.dp))
                         .background(Berry.Accent)
                         .clickable {
-                            c.applyDisplayConfig(dpi, res, hideKb, hidePad, blockIme)
+                            c.applyDisplayConfig(dpi, res, hideKb, hidePad)
                             c.showDisplaySettings = false
                         }
                         .padding(vertical = 12.dp),
@@ -609,7 +618,7 @@ private fun DisplaySettingsDialog(c: BerryController) {
 private fun NavKey(label: String, modifier: Modifier, bg: Color, onPress: () -> Unit) {
     Box(
         modifier
-            .height(38.dp)
+            .height(34.dp)
             .clip(RoundedCornerShape(10.dp))
             .background(bg)
             .clickable(onClick = onPress),

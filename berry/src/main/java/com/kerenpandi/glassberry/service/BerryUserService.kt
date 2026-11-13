@@ -67,14 +67,13 @@ class BerryUserService : IBerryService.Stub() {
     private fun unwrap(t: Throwable): Throwable =
         (t as? InvocationTargetException)?.targetException ?: t
 
-    private fun applyImePolicy(builder: VirtualDisplayConfig.Builder, blockIme: Boolean) {
+    private fun applyImePolicy(builder: VirtualDisplayConfig.Builder) {
         runCatching {
             val policy = runCatching {
-                VirtualDisplayConfig::class.java
-                    .getDeclaredField(if (blockIme) "IME_POLICY_HIDE" else "IME_POLICY_LOCAL")
-                    .apply { isAccessible = true }
-                    .getInt(null)
-            }.getOrDefault(if (blockIme) 2 else 1)
+                VirtualDisplayConfig::class.java.getDeclaredField("IME_POLICY_LOCAL").apply {
+                    isAccessible = true
+                }.getInt(null)
+            }.getOrDefault(1)
             val method = builder.javaClass.methods.firstOrNull {
                 it.name == "setImePolicy" && it.parameterTypes.size == 1 &&
                     it.parameterTypes[0] == Int::class.javaPrimitiveType
@@ -94,7 +93,6 @@ class BerryUserService : IBerryService.Stub() {
                 val width = args.getInt("width")
                 val height = args.getInt("height")
                 val dpi = args.getInt("dpi")
-                val blockIme = args.getBoolean("blockIme")
                 releaseLocked()
 
                 var lastError: Throwable? = null
@@ -102,7 +100,7 @@ class BerryUserService : IBerryService.Stub() {
                     try {
                         val builder = VirtualDisplayConfig.Builder("GlassBerry", width, height, dpi)
                             .setFlags(flags)
-                        applyImePolicy(builder, blockIme)
+                        applyImePolicy(builder)
                         if (surface != null) builder.setSurface(surface)
                         val cb = asInterface(DISPLAY_CALLBACK, Binder())
                         val id = createMethod.invoke(
