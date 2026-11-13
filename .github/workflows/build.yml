@@ -78,8 +78,14 @@ jobs:
       - name: Build debug APK
         run: gradle assembleDebug --no-daemon --stacktrace
 
-      - name: Upload APK
+      - name: Upload launcher APK
         uses: actions/upload-artifact@v4
         with:
           name: glass-launcher-debug
           path: app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Upload GlassBerry APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: glassberry-debug
+          path: berry/build/outputs/apk/debug/berry-debug.apk
