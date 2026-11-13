@@ -39,7 +39,6 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var folders by mutableStateOf<List<LauncherFolder>>(emptyList())
         private set
-        private set
     var badges by mutableStateOf<Map<String, Int>>(emptyMap())
         private set
 

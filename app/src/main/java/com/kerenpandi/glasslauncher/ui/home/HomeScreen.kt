@@ -179,7 +179,6 @@ fun HomeScreen(
                             )
                         }
                     }
-                }
             }
 
             Row(
