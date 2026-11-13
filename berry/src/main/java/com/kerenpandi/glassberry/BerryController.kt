@@ -401,6 +401,10 @@ class BerryController(private val app: Application) {
     fun openPicker() {
         search = ""
         pickerOpen = true
+        if (displayW > 0 && displayH > 0 && cursorX <= 0f && cursorY <= 0f) {
+            cursorX = displayW / 2f
+            cursorY = displayH / 2f
+        }
     }
 
     fun closePicker() {
@@ -432,6 +436,16 @@ class BerryController(private val app: Application) {
     }
 
     // ---- trackpad ------------------------------------------------------------
+
+    fun pickerCursorMove(dx: Float, dy: Float) {
+        if (displayW <= 0 || displayH <= 0) return
+        if (cursorX <= 0f && cursorY <= 0f) {
+            cursorX = displayW / 2f
+            cursorY = displayH / 2f
+        }
+        cursorX = (cursorX + dx * PAD_SENSITIVITY).coerceIn(0f, displayW.toFloat())
+        cursorY = (cursorY + dy * PAD_SENSITIVITY).coerceIn(0f, displayH.toFloat())
+    }
 
     fun trackpadHover(dx: Float, dy: Float) {
         val svc = service ?: return

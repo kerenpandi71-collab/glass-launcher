@@ -479,13 +479,11 @@ private fun Trackpad(
                             }
                         } else {
                             pressed.firstOrNull()?.let { change ->
-                                if (c.pickerOpen) {
-                                    change.consume()
-                                    return@let
-                                }
                                 val delta = change.positionChange()
                                 moved += delta.getDistance()
-                                if (dragging) {
+                                if (c.pickerOpen) {
+                                    c.pickerCursorMove(delta.x, delta.y)
+                                } else if (dragging) {
                                     c.trackpadDragMove(delta.x, delta.y)
                                 } else {
                                     c.trackpadHover(delta.x, delta.y)
