@@ -55,21 +55,25 @@ class MainActivity : ComponentActivity() {
     @Suppress("DEPRECATION")
     private fun acquireWakeLock() {
         if (wakeLock?.isHeld == true) return
-        wakeLock = getSystemService(PowerManager::class.java)
-            .newWakeLock(
-                PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ON_AFTER_RELEASE,
-                "GlassBerry::Screen",
-            )
-            .apply {
-                setReferenceCounted(false)
-                acquire(WAKELOCK_TIMEOUT_MS)
-            }
+        runCatching {
+            wakeLock = getSystemService(PowerManager::class.java)
+                .newWakeLock(
+                    PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ON_AFTER_RELEASE,
+                    "GlassBerry::Screen",
+                )
+                .apply {
+                    setReferenceCounted(false)
+                    acquire(WAKELOCK_TIMEOUT_MS)
+                }
+        }
     }
 
     override fun onUserInteraction() {
         super.onUserInteraction()
-        @Suppress("DEPRECATION")
-        wakeLock?.acquire(WAKELOCK_TIMEOUT_MS)
+        runCatching {
+            @Suppress("DEPRECATION")
+            wakeLock?.acquire(WAKELOCK_TIMEOUT_MS)
+        }
     }
 
     override fun onStop() {
