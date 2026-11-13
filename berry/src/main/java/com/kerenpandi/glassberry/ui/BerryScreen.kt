@@ -1,6 +1,7 @@
 package com.kerenpandi.glassberry.ui
 
 import android.view.SurfaceView
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -20,11 +21,16 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -36,13 +42,14 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.kerenpandi.glassberry.AppEntry
 import com.kerenpandi.glassberry.BerryController
 import com.kerenpandi.glassberry.ShizukuState
+import kotlinx.coroutines.delay
 
 @Composable
 fun BerryScreen(c: BerryController) {
     Column(
         Modifier
             .fillMaxSize()
-            .background(Berry.Body)
+            .background(Brush.verticalGradient(listOf(Berry.BodyTop, Berry.Body)))
             .statusBarsPadding()
             .padding(horizontal = 14.dp, vertical = 10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -53,9 +60,9 @@ fun BerryScreen(c: BerryController) {
             Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
+                .clip(RoundedCornerShape(12.dp))
                 .background(Berry.ScreenOff)
-                .border(1.dp, Berry.Bezel, RoundedCornerShape(8.dp)),
+                .border(1.dp, Color(0x2EFFFFFF), RoundedCornerShape(12.dp)),
         ) {
             VirtualSurface(c, Modifier.fillMaxSize())
             when {
@@ -79,9 +86,15 @@ fun BerryScreen(c: BerryController) {
 private fun SpeakerGrill() {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(5.dp, 3.dp).clip(CircleShape).background(Berry.KeySpecial))
-        Spacer(Modifier.width(6.dp))
-        Box(Modifier.size(44.dp, 4.dp).clip(CircleShape).background(Berry.KeySpecial))
-        Spacer(Modifier.width(6.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(
+            "GLASSBERRY",
+            color = Berry.InkDim,
+            fontSize = 9.sp,
+            letterSpacing = 3.sp,
+            fontFamily = FontFamily.Monospace,
+        )
+        Spacer(Modifier.width(8.dp))
         Box(Modifier.size(5.dp, 3.dp).clip(CircleShape).background(Berry.KeySpecial))
     }
 }
@@ -142,7 +155,13 @@ private fun TopStrip(c: BerryController, modifier: Modifier) {
 
 @Composable
 private fun LoadingPanel() {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    Column(
+        Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        CircularProgressIndicator(color = Berry.Accent, strokeWidth = 2.dp, modifier = Modifier.size(26.dp))
+        Spacer(Modifier.height(12.dp))
         Text(
             "Menyiapkan layar virtual…",
             color = Berry.InkDim,
@@ -226,7 +245,7 @@ private fun AppPicker(c: BerryController) {
             modifier = Modifier.padding(horizontal = 12.dp),
             maxLines = 1,
         )
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(6.dp))
         Box(
             Modifier
                 .padding(horizontal = 12.dp)
@@ -252,37 +271,67 @@ private fun AppPicker(c: BerryController) {
 
 @Composable
 private fun AppRow(app: AppEntry, onPress: () -> Unit) {
-    Column(
+    Row(
         Modifier
             .fillMaxWidth()
             .clickable(onClick = onPress)
-            .padding(horizontal = 12.dp, vertical = 9.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            app.label,
-            color = Berry.Ink,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Medium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-            app.packageName,
-            color = Berry.InkDim,
-            fontSize = 10.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        Box(
+            Modifier
+                .size(38.dp)
+                .clip(RoundedCornerShape(9.dp))
+                .background(Berry.Key),
+            contentAlignment = Alignment.Center,
+        ) {
+            app.icon?.let { icon ->
+                Image(
+                    bitmap = icon,
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.size(30.dp),
+                )
+            } ?: Box(
+                Modifier
+                    .size(18.dp)
+                    .clip(CircleShape)
+                    .background(Berry.KeySpecial),
+            )
+        }
+        Spacer(Modifier.width(10.dp))
+        Column {
+            Text(
+                app.label,
+                color = Berry.Ink,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                app.packageName,
+                color = Berry.InkDim,
+                fontSize = 10.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 
 @Composable
 private fun MessageBanner(text: String, modifier: Modifier, onDismiss: () -> Unit) {
+    LaunchedEffect(text) {
+        delay(4000)
+        onDismiss()
+    }
     Box(
         modifier
             .padding(12.dp)
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(10.dp))
             .background(Berry.Bezel)
+            .border(1.dp, Color(0x2EFFFFFF), RoundedCornerShape(10.dp))
             .clickable(onClick = onDismiss)
             .padding(horizontal = 14.dp, vertical = 10.dp),
     ) {
@@ -312,11 +361,11 @@ private fun NavStrip(c: BerryController) {
 }
 
 @Composable
-private fun NavKey(label: String, modifier: Modifier, bg: androidx.compose.ui.graphics.Color, onPress: () -> Unit) {
+private fun NavKey(label: String, modifier: Modifier, bg: Color, onPress: () -> Unit) {
     Box(
         modifier
             .height(38.dp)
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(10.dp))
             .background(bg)
             .clickable(onClick = onPress),
         contentAlignment = Alignment.Center,

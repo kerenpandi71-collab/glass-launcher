@@ -14,8 +14,8 @@ android {
         applicationId = "com.kerenpandi.glassberry"
         minSdk = 33
         targetSdk = 35
-        versionCode = 4
-        versionName = "2.0"
+        versionCode = 5
+        versionName = "2.1"
     }
 
     signingConfigs {

@@ -8,6 +8,7 @@ import androidx.compose.ui.graphics.Color
 
 object Berry {
     val Body = Color(0xFF17171A)
+    val BodyTop = Color(0xFF202026)
     val Key = Color(0xFF26262B)
     val KeySpecial = Color(0xFF3A3A40)
     val Accent = Color(0xFFDF2029)

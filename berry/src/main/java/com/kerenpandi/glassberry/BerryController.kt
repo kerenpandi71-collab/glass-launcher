@@ -18,6 +18,9 @@ import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.Surface
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.core.graphics.drawable.toBitmap
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -27,7 +30,12 @@ import java.util.concurrent.Executors
 
 enum class ShizukuState { NOT_INSTALLED, NOT_RUNNING, NO_PERMISSION, CONNECTING, READY }
 
-data class AppEntry(val label: String, val packageName: String, val component: String)
+data class AppEntry(
+    val label: String,
+    val packageName: String,
+    val component: String,
+    val icon: ImageBitmap? = null,
+)
 
 /** Owns the Shizuku helper connection, the virtual display and all input sent to it. */
 class BerryController(private val app: Application) {
@@ -203,10 +211,14 @@ class BerryController(private val app: Application) {
                 pm.queryIntentActivities(intent, PackageManager.ResolveInfoFlags.of(0L))
                     .filter { it.activityInfo.packageName != app.packageName }
                     .map {
+                        val icon = runCatching {
+                            it.loadIcon(pm).toBitmap(96, 96).asImageBitmap()
+                        }.getOrNull()
                         AppEntry(
                             label = it.loadLabel(pm).toString(),
                             packageName = it.activityInfo.packageName,
                             component = "${it.activityInfo.packageName}/${it.activityInfo.name}",
+                            icon = icon,
                         )
                     }
                     .distinctBy { it.component }
@@ -356,9 +368,12 @@ class BerryController(private val app: Application) {
     }
 
     fun launch(entry: AppEntry) {
-        val svc = service ?: return
+        val svc = service
         val id = displayId
-        if (id < 0) return
+        if (svc == null || id < 0) {
+            message = "Layar virtual belum siap. Tunggu sebentar lalu coba lagi."
+            return
+        }
         pickerOpen = false
         currentApp = entry
         message = null
@@ -456,6 +471,10 @@ class BerryController(private val app: Application) {
         val id = displayId
         if (id < 0 || pickerOpen) return true
         if (displayW <= 0 || displayH <= 0 || viewW <= 0 || viewH <= 0) return true
+        if (e.actionMasked == MotionEvent.ACTION_SCROLL) {
+            inject(svc, e, id)
+            return true
+        }
         synchronized(touchLock) {
             when (e.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
