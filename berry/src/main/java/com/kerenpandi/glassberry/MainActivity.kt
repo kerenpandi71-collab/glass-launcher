@@ -20,7 +20,9 @@ class MainActivity : Activity() {
 
     private var virtualDisplay: android.hardware.display.VirtualDisplay? = null
     private var presentation: BerryPresentation? = null
+    private var pendingPresentation: BerryPresentation? = null
     private var fallbackView: BerryScreenView? = null
+    private var resumed = false
 
     private val dispatcher = object : BerryKeyboardView.Listener {
         private fun refresh() {
@@ -69,6 +71,7 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        installCrashCatcher()
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         hideSystemBars()
 
@@ -106,6 +109,22 @@ class MainActivity : Activity() {
         )
 
         setContentView(root)
+    }
+
+    private fun installCrashCatcher() {
+        val prefs = getSharedPreferences("glassberry_crash", MODE_PRIVATE)
+        CrashLog.last = prefs.getString("trace", null)
+        val previous = CrashLog.last
+        if (!previous.isNullOrEmpty()) {
+            prefs.edit().remove("trace").apply()
+        }
+        val upstream = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, error ->
+            runCatching {
+                prefs.edit().putString("trace", android.util.Log.getStackTraceString(error)).apply()
+            }
+            upstream?.uncaughtException(thread, error)
+        }
     }
 
     private fun hideSystemBars() {
@@ -148,11 +167,38 @@ class MainActivity : Activity() {
             return fallbackToDirectView()
         }
 
-        presentation = pres
-        pres.show()
+        pendingPresentation = pres
+        showPendingPresentation()
+    }
+
+    private fun showPendingPresentation() {
+        val pres = pendingPresentation ?: return
+        if (!resumed) return
+        pendingPresentation = null
+        val shown = runCatching { pres.show() }.isSuccess
+        if (shown) {
+            presentation = pres
+        } else {
+            runCatching { pres.dismiss() }
+            runCatching { virtualDisplay?.release() }
+            virtualDisplay = null
+            fallbackToDirectView()
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        resumed = true
+        showPendingPresentation()
+    }
+
+    override fun onPause() {
+        resumed = false
+        super.onPause()
     }
 
     private fun stopVirtualDisplay() {
+        pendingPresentation = null
         runCatching { presentation?.dismiss() }
         presentation = null
         runCatching { virtualDisplay?.release() }
@@ -163,6 +209,7 @@ class MainActivity : Activity() {
         if (fallbackView == null) {
             val view = BerryScreenView(this)
             view.os = BerryOS(this)
+            view.os?.showCrashLog()
             fallbackView = view
             screenContainer.addView(
                 view,
