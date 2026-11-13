@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import java.util.concurrent.TimeUnit
 
 object ThemeModes {
     const val SYSTEM = "system"
@@ -16,12 +15,6 @@ object IconShapes {
     const val CIRCLE = "circle"
     const val SQUIRCLE = "squircle"
 }
-
-data class WeatherNow(
-    val temperatureC: Double,
-    val code: Int,
-    val city: String
-)
 
 class LauncherSettings(context: Context) {
 
@@ -44,10 +37,6 @@ class LauncherSettings(context: Context) {
     var iconPackPackage by mutableStateOf(prefs.getString(KEY_ICON_PACK, "") ?: "")
         private set
     var notificationBadges by mutableStateOf(prefs.getBoolean(KEY_BADGES, true))
-        private set
-    var showGlance by mutableStateOf(prefs.getBoolean(KEY_GLANCE, true))
-        private set
-    var weatherCity by mutableStateOf(prefs.getString(KEY_WEATHER_CITY, "") ?: "")
         private set
     var hiddenApps by mutableStateOf(prefs.getStringSet(KEY_HIDDEN, emptySet())?.toSet() ?: emptySet<String>())
         private set
@@ -97,41 +86,11 @@ class LauncherSettings(context: Context) {
         prefs.edit().putBoolean(KEY_BADGES, value).apply()
     }
 
-    fun updateShowGlance(value: Boolean) {
-        showGlance = value
-        prefs.edit().putBoolean(KEY_GLANCE, value).apply()
-    }
-
-    fun updateWeatherCity(value: String) {
-        weatherCity = value.trim()
-        prefs.edit().putString(KEY_WEATHER_CITY, weatherCity).apply()
-    }
-
     fun toggleHiddenApp(key: String) {
         val next = hiddenApps.toMutableSet()
         if (!next.add(key)) next.remove(key)
         hiddenApps = next
         prefs.edit().putStringSet(KEY_HIDDEN, next).apply()
-    }
-
-    fun cachedWeather(): WeatherNow? {
-        val city = prefs.getString(KEY_WX_CITY, null) ?: return null
-        val time = prefs.getLong(KEY_WX_TIME, 0L)
-        if (System.currentTimeMillis() - time > TimeUnit.MINUTES.toMillis(30)) return null
-        return WeatherNow(
-            temperatureC = prefs.getFloat(KEY_WX_TEMP, 0f).toDouble(),
-            code = prefs.getInt(KEY_WX_CODE, 0),
-            city = city
-        )
-    }
-
-    fun cacheWeather(weather: WeatherNow) {
-        prefs.edit()
-            .putFloat(KEY_WX_TEMP, weather.temperatureC.toFloat())
-            .putInt(KEY_WX_CODE, weather.code)
-            .putString(KEY_WX_CITY, weather.city)
-            .putLong(KEY_WX_TIME, System.currentTimeMillis())
-            .apply()
     }
 
     fun reset() {
@@ -149,8 +108,6 @@ class LauncherSettings(context: Context) {
         iconShape = prefs.getString(KEY_ICON_SHAPE, IconShapes.CIRCLE) ?: IconShapes.CIRCLE
         iconPackPackage = prefs.getString(KEY_ICON_PACK, "") ?: ""
         notificationBadges = prefs.getBoolean(KEY_BADGES, true)
-        showGlance = prefs.getBoolean(KEY_GLANCE, true)
-        weatherCity = prefs.getString(KEY_WEATHER_CITY, "") ?: ""
         hiddenApps = prefs.getStringSet(KEY_HIDDEN, emptySet())?.toSet() ?: emptySet()
     }
 
@@ -165,12 +122,6 @@ class LauncherSettings(context: Context) {
         const val KEY_ICON_SHAPE = "icon_shape"
         const val KEY_ICON_PACK = "icon_pack_package"
         const val KEY_BADGES = "notification_badges"
-        const val KEY_GLANCE = "show_glance"
-        const val KEY_WEATHER_CITY = "weather_city"
         const val KEY_HIDDEN = "hidden_apps"
-        const val KEY_WX_TEMP = "wx_temp"
-        const val KEY_WX_CODE = "wx_code"
-        const val KEY_WX_CITY = "wx_city"
-        const val KEY_WX_TIME = "wx_time"
     }
 }

@@ -1,0 +1,2 @@
+- Menghapus fitur At a Glance (cuaca dan agenda kalender) beserta kode dan izinnya
+- Perbaikan kecil dan pembersihan kode
