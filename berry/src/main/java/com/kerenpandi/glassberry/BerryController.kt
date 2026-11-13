@@ -58,6 +58,10 @@ class BerryController(private val app: Application) {
         private set
     var resScale by mutableStateOf(1f)
         private set
+    var keyboardHidden by mutableStateOf(false)
+        private set
+    var touchpadHidden by mutableStateOf(false)
+        private set
 
     val deviceDensityDpi: Int
         get() = app.resources.displayMetrics.densityDpi
@@ -98,8 +102,6 @@ class BerryController(private val app: Application) {
         private set
     var cursorY by mutableStateOf(0f)
         private set
-    private var padDown = false
-    private var padDownTime = 0L
     private data class ActiveTouch(val id: Int, var x: Float, var y: Float)
     private val touchLock = Any()
     private val activeTouches = LinkedHashMap<String, ActiveTouch>()
@@ -303,6 +305,7 @@ class BerryController(private val app: Application) {
                 result.onSuccess { b ->
                     val id = b.getInt("displayId", -1)
                     if (id >= 0) {
+                        if (displayId < 0) setRecentsGesture(false)
                         displayId = id
                         displayW = w
                         displayH = h
@@ -336,7 +339,6 @@ class BerryController(private val app: Application) {
         currentApp = null
         pickerOpen = true
         busy = false
-        padDown = false
         keyDownTimes.clear()
 
         runCatching {
@@ -344,7 +346,10 @@ class BerryController(private val app: Application) {
                 runCatching {
                     inputWorker.execute {
                         try {
-                            if (svc != null) runCatching { svc.releaseDisplay() }
+                            if (svc != null) {
+                                runCatching { svc.runShell("settings put secure swipe_up_to_switch_apps_enabled 1") }
+                                runCatching { svc.releaseDisplay() }
+                            }
                             if (wasBinding || svc != null) {
                                 runCatching { Shizuku.unbindUserService(userServiceArgs, connection, true) }
                             }
@@ -417,7 +422,7 @@ class BerryController(private val app: Application) {
     fun trackpadHover(dx: Float, dy: Float) {
         val svc = service ?: return
         val id = displayId
-        if (id < 0 || padDown || displayW <= 0 || displayH <= 0) return
+        if (id < 0 || displayW <= 0 || displayH <= 0) return
         if (cursorX <= 0f && cursorY <= 0f) {
             cursorX = displayW / 2f
             cursorY = displayH / 2f
@@ -425,6 +430,42 @@ class BerryController(private val app: Application) {
         cursorX = (cursorX + dx * PAD_SENSITIVITY).coerceIn(0f, displayW.toFloat())
         cursorY = (cursorY + dy * PAD_SENSITIVITY).coerceIn(0f, displayH.toFloat())
         injectHoverMotion(svc, id, cursorX, cursorY)
+    }
+
+    fun trackpadScroll(dx: Float, dy: Float) {
+        val svc = service ?: return
+        val id = displayId
+        if (id < 0 || displayW <= 0 || displayH <= 0) return
+        if (cursorX <= 0f && cursorY <= 0f) {
+            cursorX = displayW / 2f
+            cursorY = displayH / 2f
+        }
+        val now = SystemClock.uptimeMillis()
+        val properties = arrayOf(
+            MotionEvent.PointerProperties().apply {
+                this.id = 0
+                toolType = MotionEvent.TOOL_TYPE_MOUSE
+            },
+        )
+        val coordinates = arrayOf(
+            MotionEvent.PointerCoords().apply {
+                x = cursorX
+                y = cursorY
+                setAxisValue(MotionEvent.AXIS_VSCROLL, -dy / 48f)
+                setAxisValue(MotionEvent.AXIS_HSCROLL, -dx / 48f)
+                pressure = 1f
+                size = 1f
+            },
+        )
+        val event = MotionEvent.obtain(
+            now, now, MotionEvent.ACTION_SCROLL, 1, properties, coordinates,
+            0, 0, 1f, 1f, 0, 0, InputDevice.SOURCE_MOUSE, 0,
+        )
+        try {
+            inject(svc, event, id)
+        } finally {
+            event.recycle()
+        }
     }
 
     private fun injectHoverMotion(svc: IBerryService, id: Int, x: Float, y: Float) {
@@ -454,40 +495,10 @@ class BerryController(private val app: Application) {
         }
     }
 
-    fun trackpadStart() {
-        val svc = service ?: return
-        val id = displayId
-        if (id < 0 || padDown || displayW <= 0 || displayH <= 0) return
-        if (cursorX <= 0f && cursorY <= 0f) {
-            cursorX = displayW / 2f
-            cursorY = displayH / 2f
-        }
-        padDown = true
-        padDownTime = SystemClock.uptimeMillis()
-        injectTouchMotion(svc, id, MotionEvent.ACTION_DOWN, cursorX, cursorY, padDownTime, padDownTime)
-    }
-
-    fun trackpadMove(dx: Float, dy: Float) {
-        val svc = service ?: return
-        val id = displayId
-        if (id < 0 || !padDown || displayW <= 0 || displayH <= 0) return
-        cursorX = (cursorX + dx * PAD_SENSITIVITY).coerceIn(0f, displayW.toFloat())
-        cursorY = (cursorY + dy * PAD_SENSITIVITY).coerceIn(0f, displayH.toFloat())
-        injectTouchMotion(svc, id, MotionEvent.ACTION_MOVE, cursorX, cursorY, padDownTime, SystemClock.uptimeMillis())
-    }
-
-    fun trackpadEnd() {
-        val svc = service ?: return
-        val id = displayId
-        if (id < 0 || !padDown) return
-        padDown = false
-        injectTouchMotion(svc, id, MotionEvent.ACTION_UP, cursorX, cursorY, padDownTime, SystemClock.uptimeMillis())
-    }
-
     fun trackpadTap() {
         val svc = service ?: return
         val id = displayId
-        if (id < 0 || padDown || displayW <= 0 || displayH <= 0) return
+        if (id < 0 || displayW <= 0 || displayH <= 0) return
         if (cursorX <= 0f && cursorY <= 0f) {
             cursorX = displayW / 2f
             cursorY = displayH / 2f
@@ -533,31 +544,47 @@ class BerryController(private val app: Application) {
 
     // ---- display settings ----------------------------------------------------
 
-    fun applyDisplayConfig(newDpiScale: Float, newResScale: Float) {
+    fun applyDisplayConfig(
+        newDpiScale: Float,
+        newResScale: Float,
+        hideKeyboard: Boolean,
+        hideTouchpad: Boolean,
+    ) {
+        keyboardHidden = hideKeyboard
+        touchpadHidden = hideTouchpad
+        val resChanged = kotlin.math.abs(newResScale - resScale) > 0.001f
         dpiScale = newDpiScale.coerceIn(0.4f, 1.2f)
         resScale = newResScale.coerceIn(0.5f, 1f)
         val svc = service ?: return
         val id = displayId
-        if (id < 0 || surfaceW <= 0 || surfaceH <= 0) return
-        val w = (surfaceW * resScale).toInt() and 1.inv()
-        val h = (surfaceH * resScale).toInt() and 1.inv()
+        if (id < 0 || displayW <= 0 || displayH <= 0) return
+        if (resChanged) {
+            message = "Resolusi diubah ke ${(surfaceW * resScale).toInt()}x${(surfaceH * resScale).toInt()}"
+            return
+        }
         val dpi = (app.resources.displayMetrics.densityDpi * dpiScale).toInt().coerceIn(120, 480)
-        if (w <= 0 || h <= 0) return
         worker.execute {
-            val result = runCatching { svc.resizeDisplay(w, h, dpi) }
+            val result = runCatching { svc.resizeDisplay(displayW, displayH, dpi) }
             main.post {
                 result.onSuccess { b ->
                     val err = b?.getString("error")
                     if (err != null) {
                         message = "Gagal mengubah tampilan: $err"
                     } else {
-                        displayW = w
-                        displayH = h
-                        message = "Tampilan: ${w}x${h} @ ${dpi}dpi"
+                        message = "Tampilan: ${displayW}x${displayH} @ ${dpi}dpi"
                     }
                 }.onFailure {
                     message = "Gagal mengubah tampilan: ${it.message}"
                 }
+            }
+        }
+    }
+
+    private fun setRecentsGesture(enabled: Boolean) {
+        val svc = service ?: return
+        worker.execute {
+            runCatching {
+                svc.runShell("settings put secure swipe_up_to_switch_apps_enabled ${if (enabled) 1 else 0}")
             }
         }
     }
@@ -597,6 +624,10 @@ class BerryController(private val app: Application) {
     fun sendHomeKey() {
         sendKey(KeyEvent.KEYCODE_HOME, true)
         sendKey(KeyEvent.KEYCODE_HOME, false)
+    }
+
+    fun goHome() {
+        openPicker()
     }
 
     fun sendBackKey() {

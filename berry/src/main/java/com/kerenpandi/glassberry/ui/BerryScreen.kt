@@ -10,6 +10,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -29,6 +30,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -73,11 +76,24 @@ fun BerryScreen(c: BerryController) {
         Box(
             Modifier
                 .fillMaxWidth()
-                .aspectRatio(1f)
+                .then(
+                    if (c.keyboardHidden && c.touchpadHidden) {
+                        Modifier.weight(1f)
+                    } else {
+                        Modifier.aspectRatio(1f)
+                    },
+                )
                 .background(Berry.ScreenOff)
                 .border(1.dp, Color(0x2EFFFFFF)),
         ) {
-            VirtualSurface(c, Modifier.fillMaxSize())
+            BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                VirtualSurface(
+                    c,
+                    Modifier
+                        .width(maxWidth * c.resScale)
+                        .height(maxHeight * c.resScale),
+                )
+            }
             when {
                 c.shizukuState != ShizukuState.READY -> ShizukuPanel(c)
                 c.displayId < 0 -> LoadingPanel()
@@ -86,21 +102,19 @@ fun BerryScreen(c: BerryController) {
             c.message?.let { text ->
                 MessageBanner(text, Modifier.align(Alignment.BottomCenter)) { c.message = null }
             }
-            TopStrip(c, Modifier.align(Alignment.TopCenter))
             CursorOverlay(c, Modifier.fillMaxSize())
         }
         Column(
             Modifier
                 .fillMaxWidth()
-                .weight(1f)
                 .background(Brush.verticalGradient(listOf(Berry.BodyTop, Berry.Body)))
                 .padding(horizontal = 10.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             SpeakerGrill()
             NavStrip(c)
-            BerryKeyboard(c)
-            Trackpad(c, Modifier.weight(1f))
+            if (!c.keyboardHidden) BerryKeyboard(c)
+            if (!c.touchpadHidden) Trackpad(c, Modifier.weight(1f))
         }
     }
 
@@ -152,32 +166,6 @@ private fun VirtualSurface(c: BerryController, modifier: Modifier) {
             }
         },
     )
-}
-
-@Composable
-private fun TopStrip(c: BerryController, modifier: Modifier) {
-    if (c.displayId < 0 || c.pickerOpen) return
-    Row(
-        modifier
-            .fillMaxWidth()
-            .background(Berry.Bezel.copy(alpha = 0.85f))
-            .padding(horizontal = 10.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            c.currentApp?.label ?: "Layar virtual",
-            color = Berry.InkDim,
-            fontSize = 11.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Spacer(Modifier.weight(1f))
-        Text(
-            "display ${c.displayId}",
-            color = Berry.InkDim,
-            fontSize = 10.sp,
-        )
-    }
 }
 
 @Composable
@@ -374,6 +362,29 @@ private fun MessageBanner(text: String, modifier: Modifier, onDismiss: () -> Uni
 }
 
 @Composable
+private fun SettingToggle(label: String, checked: Boolean, onToggle: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onToggle)
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, color = Berry.Ink, fontSize = 13.sp, modifier = Modifier.weight(1f))
+        Switch(
+            checked = checked,
+            onCheckedChange = { onToggle() },
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Berry.Ink,
+                checkedTrackColor = Berry.Accent,
+                uncheckedThumbColor = Berry.InkDim,
+                uncheckedTrackColor = Berry.KeySpecial,
+            ),
+        )
+    }
+}
+
+@Composable
 private fun NavStrip(c: BerryController) {
     Row(
         Modifier
@@ -383,7 +394,7 @@ private fun NavStrip(c: BerryController) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         NavKey("MENU", Modifier.weight(1f), Berry.Key) { c.sendMenu() }
-        NavKey("HOME", Modifier.weight(1f), Berry.Key) { c.sendHomeKey() }
+        NavKey("HOME", Modifier.weight(1f), Berry.Key) { c.goHome() }
         NavKey("BACK", Modifier.weight(1f), Berry.Accent) { c.sendBackKey() }
     }
 }
@@ -404,7 +415,6 @@ private fun Trackpad(c: BerryController, modifier: Modifier = Modifier) {
                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     val startTime = System.currentTimeMillis()
                     var twoFinger = false
-                    var dragging = false
                     var settingsShown = false
                     var moved = 0f
                     while (true) {
@@ -412,13 +422,9 @@ private fun Trackpad(c: BerryController, modifier: Modifier = Modifier) {
                         val pressed = event.changes.filter { it.pressed }
                         if (pressed.size >= 2) twoFinger = true
                         if (twoFinger) {
-                            if (!dragging) {
-                                c.trackpadStart()
-                                dragging = true
-                            }
-                            pressed.lastOrNull()?.let { change ->
+                            pressed.firstOrNull()?.let { change ->
                                 val delta = change.positionChange()
-                                c.trackpadMove(delta.x, delta.y)
+                                c.trackpadScroll(delta.x, delta.y)
                                 change.consume()
                             }
                         } else {
@@ -438,9 +444,7 @@ private fun Trackpad(c: BerryController, modifier: Modifier = Modifier) {
                             }
                         }
                         if (event.changes.none { it.pressed }) {
-                            if (dragging) {
-                                c.trackpadEnd()
-                            } else if (!twoFinger && !settingsShown &&
+                            if (!twoFinger && !settingsShown &&
                                 System.currentTimeMillis() - startTime < 260 &&
                                 moved < 12f
                             ) {
@@ -492,6 +496,8 @@ private fun CursorOverlay(c: BerryController, modifier: Modifier) {
 private fun DisplaySettingsDialog(c: BerryController) {
     var dpi by remember(c.showDisplaySettings) { mutableStateOf(c.dpiScale) }
     var res by remember(c.showDisplaySettings) { mutableStateOf(c.resScale) }
+    var hideKb by remember(c.showDisplaySettings) { mutableStateOf(c.keyboardHidden) }
+    var hidePad by remember(c.showDisplaySettings) { mutableStateOf(c.touchpadHidden) }
     val (baseW, baseH) = c.surfaceSize
     Dialog(onDismissRequest = { c.showDisplaySettings = false }) {
         Column(
@@ -539,6 +545,9 @@ private fun DisplaySettingsDialog(c: BerryController) {
                     inactiveTrackColor = Berry.KeySpecial,
                 ),
             )
+            Spacer(Modifier.height(8.dp))
+            SettingToggle("Sembunyikan keyboard", hideKb) { hideKb = !hideKb }
+            SettingToggle("Sembunyikan touchpad", hidePad) { hidePad = !hidePad }
             Spacer(Modifier.height(16.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Box(
@@ -558,7 +567,7 @@ private fun DisplaySettingsDialog(c: BerryController) {
                         .clip(RoundedCornerShape(10.dp))
                         .background(Berry.Accent)
                         .clickable {
-                            c.applyDisplayConfig(dpi, res)
+                            c.applyDisplayConfig(dpi, res, hideKb, hidePad)
                             c.showDisplaySettings = false
                         }
                         .padding(vertical = 12.dp),
