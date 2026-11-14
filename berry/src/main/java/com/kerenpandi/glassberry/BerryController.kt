@@ -1,12 +1,15 @@
 package com.kerenpandi.glassberry
 
 import android.app.Application
+import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.BatteryManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
@@ -64,6 +67,11 @@ class BerryController(private val app: Application) {
         private set
     var androidKeyboardEnabled by mutableStateOf(true)
         private set
+    var landscapeMode by mutableStateOf(false)
+        private set
+    var batteryPct by mutableIntStateOf(-1)
+        private set
+    var fps by mutableIntStateOf(0)
 
     val deviceDensityDpi: Int
         get() = app.resources.displayMetrics.densityDpi
@@ -148,7 +156,22 @@ class BerryController(private val app: Application) {
         }
     }
 
+    private val batteryReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            val level = intent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+            val scale = intent?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
+            if (level >= 0 && scale > 0) batteryPct = level * 100 / scale
+        }
+    }
+
     fun init() {
+        runCatching {
+            val sticky = app.registerReceiver(
+                batteryReceiver,
+                IntentFilter(Intent.ACTION_BATTERY_CHANGED),
+            )
+            sticky?.let { batteryReceiver.onReceive(app, it) }
+        }
         Shizuku.addBinderReceivedListenerSticky { main.post { refresh() } }
         Shizuku.addBinderDeadListener {
             main.post {
@@ -630,10 +653,12 @@ class BerryController(private val app: Application) {
         hideKeyboard: Boolean,
         hideTouchpad: Boolean,
         androidKbEnabled: Boolean,
+        landscape: Boolean,
     ) {
         keyboardHidden = hideKeyboard
         touchpadHidden = hideTouchpad
         androidKeyboardEnabled = androidKbEnabled
+        landscapeMode = landscape
         setImeSuppressed(!androidKbEnabled)
         val resChanged = kotlin.math.abs(newResScale - resScale) > 0.001f
         dpiScale = newDpiScale.coerceIn(0.4f, 1.2f)

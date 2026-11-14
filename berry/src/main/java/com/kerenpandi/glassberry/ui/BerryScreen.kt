@@ -1,5 +1,8 @@
 package com.kerenpandi.glassberry.ui
 
+import android.app.Activity
+import android.content.ContextWrapper
+import android.content.pm.ActivityInfo
 import android.view.SurfaceView
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -41,6 +44,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -92,60 +96,169 @@ fun BerryScreen(c: BerryController) {
     }
     val pickerScroll: (Float) -> Unit = { dy -> listState.dispatchRawDelta(-dy * 2f) }
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(Berry.Bezel)
-            .statusBarsPadding(),
-    ) {
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .then(
-                    if (c.keyboardHidden && c.touchpadHidden) {
-                        Modifier.weight(1f)
-                    } else {
-                        Modifier.aspectRatio(1f)
-                    },
-                )
-                .background(Berry.ScreenOff)
-                .border(1.dp, Color(0x2EFFFFFF))
-                .onSizeChanged { screenSize = android.util.Size(it.width, it.height) },
-        ) {
-            BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                VirtualSurface(
-                    c,
-                    Modifier
-                        .width(maxWidth * c.resScale)
-                        .height(maxHeight * c.resScale),
-                )
+    val context = LocalContext.current
+    LaunchedEffect(c.landscapeMode) {
+        var ctx = context
+        while (ctx is ContextWrapper) {
+            if (ctx is Activity) {
+                ctx.requestedOrientation = if (c.landscapeMode) {
+                    ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                } else {
+                    ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                }
+                break
             }
-            when {
-                c.shizukuState != ShizukuState.READY -> ShizukuPanel(c)
-                c.displayId < 0 -> LoadingPanel()
-                c.pickerOpen -> AppPicker(c, listState) { listTopY = it }
-            }
-            c.message?.let { text ->
-                MessageBanner(text, Modifier.align(Alignment.BottomCenter)) { c.message = null }
-            }
-            CursorOverlay(c, Modifier.fillMaxSize())
+            ctx = ctx.baseContext
         }
+    }
+
+    LaunchedEffect(Unit) {
+        var last = System.currentTimeMillis()
+        var frames = 0
+        while (true) {
+            withFrameNanos { }
+            frames++
+            val now = System.currentTimeMillis()
+            if (now - last >= 1000) {
+                c.fps = ((frames * 1000) / (now - last).coerceAtLeast(1)).toInt()
+                frames = 0
+                last = now
+            }
+        }
+    }
+
+    if (c.landscapeMode) {
+        Box(Modifier.fillMaxSize()) {
+            ScreenBox(
+                c,
+                Modifier.fillMaxSize(),
+                listState,
+                onListTop = { listTopY = it },
+                onScreenSize = { screenSize = it },
+            )
+            Box(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .statusBarsPadding()
+                    .padding(8.dp),
+            ) {
+                PillButton("MENU 2") { c.showDisplaySettings = true }
+            }
+        }
+    } else {
         Column(
             Modifier
-                .fillMaxWidth()
-                .background(Brush.verticalGradient(listOf(Berry.BodyTop, Berry.Body)))
-                .padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+                .fillMaxSize()
+                .background(Berry.Bezel)
+                .statusBarsPadding(),
         ) {
-            SpeakerGrill()
-            if (!c.keyboardHidden) BerryKeyboard(c)
-            if (!c.touchpadHidden) Trackpad(c, Modifier.weight(1f), pickerTap, pickerScroll)
-            NavStrip(c)
+            ScreenBox(
+                c,
+                Modifier
+                    .fillMaxWidth()
+                    .then(
+                        if (c.keyboardHidden && c.touchpadHidden) {
+                            Modifier.weight(1f)
+                        } else {
+                            Modifier.aspectRatio(1f)
+                        },
+                    ),
+                listState,
+                onListTop = { listTopY = it },
+                onScreenSize = { screenSize = it },
+            )
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .background(Brush.verticalGradient(listOf(Berry.BodyTop, Berry.Body)))
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                StatusStrip(c)
+                SpeakerGrill()
+                if (!c.touchpadHidden) {
+                    Trackpad(c, Modifier.weight(1f), pickerTap, pickerScroll)
+                } else {
+                    Spacer(Modifier.weight(1f))
+                }
+                if (!c.keyboardHidden) BerryKeyboard(c)
+                NavStrip(c)
+            }
         }
     }
 
     if (c.showDisplaySettings) {
         DisplaySettingsDialog(c)
+    }
+}
+
+@Composable
+private fun ScreenBox(
+    c: BerryController,
+    modifier: Modifier,
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    onListTop: (Float) -> Unit,
+    onScreenSize: (android.util.Size) -> Unit,
+) {
+    Box(
+        modifier
+            .background(Berry.ScreenOff)
+            .border(1.dp, Color(0x2EFFFFFF))
+            .onSizeChanged { onScreenSize(android.util.Size(it.width, it.height)) },
+    ) {
+        BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            VirtualSurface(
+                c,
+                Modifier
+                    .width(maxWidth * c.resScale)
+                    .height(maxHeight * c.resScale),
+            )
+        }
+        when {
+            c.shizukuState != ShizukuState.READY -> ShizukuPanel(c)
+            c.displayId < 0 -> LoadingPanel()
+            c.pickerOpen -> AppPicker(c, listState) { onListTop(it) }
+        }
+        c.message?.let { text ->
+            MessageBanner(text, Modifier.align(Alignment.BottomCenter)) { c.message = null }
+        }
+        CursorOverlay(c, Modifier.fillMaxSize())
+    }
+}
+
+@Composable
+private fun StatusStrip(c: BerryController) {
+    var clock by remember { mutableStateOf("") }
+    LaunchedEffect(Unit) {
+        val fmt = java.text.SimpleDateFormat("HH:mm · EEE d MMM", java.util.Locale("id"))
+        while (true) {
+            clock = fmt.format(java.util.Date())
+            delay(1000)
+        }
+    }
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            if (c.batteryPct >= 0) "BAT ${c.batteryPct}%" else "BAT --",
+            color = Berry.InkDim,
+            fontSize = 10.sp,
+            fontFamily = FontFamily.Monospace,
+        )
+        Text(
+            "${c.fps} FPS",
+            color = Berry.InkDim,
+            fontSize = 10.sp,
+            fontFamily = FontFamily.Monospace,
+        )
+        Text(
+            clock,
+            color = Berry.InkDim,
+            fontSize = 10.sp,
+            fontFamily = FontFamily.Monospace,
+        )
     }
 }
 
@@ -568,6 +681,7 @@ private fun DisplaySettingsDialog(c: BerryController) {
     var hideKb by remember(c.showDisplaySettings) { mutableStateOf(c.keyboardHidden) }
     var hidePad by remember(c.showDisplaySettings) { mutableStateOf(c.touchpadHidden) }
     var kb by remember(c.showDisplaySettings) { mutableStateOf(c.androidKeyboardEnabled) }
+    var ls by remember(c.showDisplaySettings) { mutableStateOf(c.landscapeMode) }
     val (baseW, baseH) = c.surfaceSize
     Dialog(onDismissRequest = { c.showDisplaySettings = false }) {
         Column(
@@ -619,6 +733,7 @@ private fun DisplaySettingsDialog(c: BerryController) {
             SettingToggle("Sembunyikan keyboard", hideKb) { hideKb = !hideKb }
             SettingToggle("Sembunyikan touchpad", hidePad) { hidePad = !hidePad }
             SettingToggle("Keyboard Android", kb) { kb = !kb }
+            SettingToggle("Mode landscape layar penuh", ls) { ls = !ls }
             Spacer(Modifier.height(4.dp))
             Text(
                 "Keyboard Android otomatis mati saat kamu mengetik dengan keyboard GlassBerry, " +
@@ -645,7 +760,7 @@ private fun DisplaySettingsDialog(c: BerryController) {
                         .clip(RoundedCornerShape(10.dp))
                         .background(Berry.Accent)
                         .clickable {
-                            c.applyDisplayConfig(dpi, res, hideKb, hidePad, kb)
+                            c.applyDisplayConfig(dpi, res, hideKb, hidePad, kb, ls)
                             c.showDisplaySettings = false
                         }
                         .padding(vertical = 12.dp),
